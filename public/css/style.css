@@ -1,0 +1,498 @@
+/* ==========================================================================
+   🐾 銀喵 YinMiao - 全域基本設定
+   ========================================================================== */
+:root {
+    --primary-pink: #ffb7c5;
+    --dark-pink: #ff7b9c;
+    --soft-white: #fff5f7;
+    --text-color: #5a4a42;
+    --success-green: #4caf50;
+    --danger-red: #f44336;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    padding: 0;
+    background-color: var(--soft-white);
+    font-family: 'Noto Sans TC', 'Microsoft JhengHei', sans-serif;
+    color: var(--text-color);
+    overflow-x: hidden;
+}
+
+/* ==========================================================================
+   ✨ 浮動裝飾物特效 (背景動畫)
+   ========================================================================== */
+.decorations div {
+    position: fixed;
+    font-size: 2rem;
+    z-index: -1;
+    opacity: 0.3;
+    animation: float 6s ease-in-out infinite;
+    pointer-events: none;
+}
+
+.paw { top: 10%; left: 5%; }
+.star { top: 20%; right: 10%; animation-delay: 1s !important; }
+.heart { bottom: 15%; left: 8%; animation-delay: 2s !important; }
+.fish { bottom: 20%; right: 5%; animation-delay: 3s !important; }
+
+@keyframes float {
+    0%, 100% { transform: translateY(0) rotate(0deg); }
+    50% { transform: translateY(-20px) rotate(10deg); }
+}
+
+/* ==========================================================================
+   🏡 首頁與主要大框架 (Container & Hero)
+   ========================================================================== */
+.container {
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 40px 20px;
+    text-align: center;
+}
+
+.hero-section {
+    margin-bottom: 60px;
+}
+
+.avatar-wrapper {
+    background: white;
+    width: 120px;
+    height: 120px;
+    border-radius: 50%;
+    margin: 0 auto 20px;
+    box-shadow: 0 10px 20px rgba(255, 183, 197, 0.4);
+    border: 5px solid var(--primary-pink);
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.avatar-wrapper img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 50%;
+}
+
+.avatar-wrapper .emoji-avatar {
+    font-size: 4rem;
+    line-height: 120px;
+}
+
+h1 {
+    font-family: 'ZCOOL XiaoWei', serif;
+    font-size: 3rem;
+    color: var(--dark-pink);
+    margin: 0;
+}
+
+.tagline {
+    font-size: 1.2rem;
+    color: #888;
+    margin-bottom: 30px;
+}
+
+/* 通用精美按鈕 */
+.btn-main {
+    display: inline-block;
+    background: var(--dark-pink);
+    color: white;
+    padding: 15px 30px;
+    border-radius: 50px;
+    text-decoration: none;
+    font-weight: bold;
+    font-size: 1.1rem;
+    border: none;
+    cursor: pointer;
+    transition: 0.3s;
+    box-shadow: 0 5px 15px rgba(255, 123, 156, 0.3);
+}
+
+.btn-main:hover {
+    transform: scale(1.05);
+    background: #ff5e84;
+}
+
+.btn-secondary {
+    display: inline-block;
+    background: white;
+    color: var(--dark-pink);
+    padding: 12px 25px;
+    border-radius: 50px;
+    text-decoration: none;
+    font-weight: bold;
+    border: 2px solid var(--primary-pink);
+    cursor: pointer;
+    transition: 0.3s;
+}
+
+.btn-secondary:hover {
+    background: var(--soft-white);
+    border-color: var(--dark-pink);
+}
+
+/* ==========================================================================
+   ⚡ 特色展示卡片 (Features Grid)
+   ========================================================================== */
+.features-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 20px;
+    margin-bottom: 60px;
+}
+
+.feature-card {
+    background: white;
+    padding: 30px;
+    border-radius: 20px;
+    border: 2px solid var(--primary-pink);
+    transition: 0.3s;
+    text-align: center;
+}
+
+.feature-card:hover {
+    transform: translateY(-10px);
+    background: #fffdfd;
+    box-shadow: 0 8px 20px rgba(255, 183, 197, 0.2);
+}
+
+.feature-card .icon { 
+    font-size: 2.5rem; 
+    display: block; 
+    margin-bottom: 10px; 
+}
+
+.feature-card h3 { 
+    color: var(--dark-pink); 
+    margin: 0 0 10px 0; 
+}
+
+.feature-card p {
+    margin: 0;
+    font-size: 0.95rem;
+    line-height: 1.5;
+}
+
+/* ==========================================================================
+   📖 說明手冊區塊 (Guide Box)
+   ========================================================================== */
+.section-title {
+    font-family: 'ZCOOL XiaoWei', serif;
+    font-size: 2rem;
+    color: var(--dark-pink);
+    margin-bottom: 30px;
+}
+
+.guide-box {
+    background: rgba(255, 255, 255, 0.7);
+    padding: 30px;
+    border-radius: 25px;
+    border: 3px dashed var(--primary-pink);
+}
+
+.guide-item {
+    display: flex;
+    align-items: flex-start;
+    text-align: left;
+    margin-bottom: 25px;
+}
+
+.guide-item:last-child {
+    margin-bottom: 0;
+}
+
+.guide-num {
+    background: var(--primary-pink);
+    color: white;
+    width: 35px;
+    height: 35px;
+    line-height: 35px;
+    text-align: center;
+    border-radius: 50%;
+    font-weight: bold;
+    margin-right: 15px;
+    flex-shrink: 0;
+}
+
+.guide-text h4 { 
+    margin: 0 0 5px; 
+    color: var(--dark-pink); 
+}
+
+.guide-text p { 
+    margin: 0; 
+    font-size: 0.95rem; 
+    line-height: 1.6; 
+}
+
+code {
+    background: #fee2e9;
+    color: #e91e63;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: Consolas, Monaco, monospace;
+    font-size: 0.9em;
+}
+
+/* ==========================================================================
+   🌐 網頁控制台專用佈局 (Dashboard & Manage)
+   ========================================================================== */
+
+/* 導航列或返回按鈕區塊 */
+.dashboard-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 40px;
+    text-align: left;
+    background: white;
+    padding: 20px 30px;
+    border-radius: 20px;
+    border: 2px solid var(--primary-pink);
+}
+
+.user-info {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.user-avatar {
+    width: 45px;
+    height: 45px;
+    border-radius: 50%;
+    border: 2px solid var(--primary-pink);
+}
+
+/* 伺服器選擇網格 */
+.guilds-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 25px;
+    margin-top: 20px;
+}
+
+.guild-card {
+    background: white;
+    border-radius: 20px;
+    padding: 25px 20px;
+    border: 2px solid var(--primary-pink);
+    text-align: center;
+    transition: 0.3s;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-between;
+    min-height: 240px;
+}
+
+.guild-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 20px rgba(255, 183, 197, 0.3);
+}
+
+.guild-icon {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    margin-bottom: 15px;
+    border: 3px solid var(--primary-pink);
+    object-fit: cover;
+    background-color: #f0f0f0;
+}
+
+.guild-icon-placeholder {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    margin-bottom: 15px;
+    border: 3px solid var(--primary-pink);
+    background: var(--primary-pink);
+    color: white;
+    font-size: 1.8rem;
+    font-weight: bold;
+    line-height: 74px;
+    text-align: center;
+}
+
+.guild-name {
+    font-weight: bold;
+    font-size: 1.1rem;
+    margin-bottom: 15px;
+    color: var(--text-color);
+    word-break: break-word;
+}
+
+/* ==========================================================================
+   📝 後台表單與輸入控制項 (Forms & Inputs)
+   ========================================================================== */
+.config-panel {
+    background: white;
+    border-radius: 25px;
+    border: 2px solid var(--primary-pink);
+    padding: 40px;
+    text-align: left;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.02);
+}
+
+.form-group {
+    margin-bottom: 25px;
+}
+
+.form-group:last-child {
+    margin-bottom: 0;
+}
+
+.form-group label {
+    display: block;
+    font-weight: bold;
+    margin-bottom: 10px;
+    color: var(--dark-pink);
+    font-size: 1.05rem;
+}
+
+.form-control {
+    width: 100%;
+    padding: 12px 18px;
+    border-radius: 12px;
+    border: 2px solid var(--primary-pink);
+    background-color: white;
+    color: var(--text-color);
+    font-size: 1rem;
+    font-family: inherit;
+    transition: 0.3s;
+}
+
+.form-control:focus {
+    outline: none;
+    border-color: var(--dark-pink);
+    box-shadow: 0 0 10px rgba(255, 123, 156, 0.2);
+}
+
+textarea.form-control {
+    resize: vertical;
+    min-height: 100px;
+}
+
+/* 開關切換鈕 (Switch Toggle) */
+.switch-group {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    margin-bottom: 20px;
+}
+
+.switch-label {
+    font-weight: bold;
+    color: var(--text-color);
+}
+
+.switch {
+    position: relative;
+    display: inline-block;
+    width: 50px;
+    height: 26px;
+    flex-shrink: 0;
+}
+
+.switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background-color: #ccc;
+    transition: .4s;
+    border-radius: 34px;
+}
+
+.slider:before {
+    position: absolute;
+    content: "";
+    height: 18px;
+    width: 18px;
+    left: 4px;
+    bottom: 4px;
+    background-color: white;
+    transition: .4s;
+    border-radius: 50%;
+}
+
+input:checked + .slider {
+    background-color: var(--dark-pink);
+}
+
+input:checked + .slider:before {
+    transform: translateX(24px);
+}
+
+/* Dynamic Voice / Role 彈性新增欄位排版 */
+.dynamic-row {
+    display: flex;
+    gap: 15px;
+    align-items: center;
+    margin-bottom: 15px;
+    background: var(--soft-white);
+    padding: 15px;
+    border-radius: 15px;
+    border: 1px dashed var(--primary-pink);
+}
+
+/* ==========================================================================
+   🚨 浮動提示框與頁尾 (Toast & Footer)
+   ========================================================================== */
+.alert-toast {
+    position: fixed;
+    top: 30px;
+    right: 30px;
+    background: var(--success-green);
+    color: white;
+    padding: 15px 30px;
+    border-radius: 30px;
+    box-shadow: 0 5px 20px rgba(0, 0, 0, 0.15);
+    z-index: 9999;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    animation: slideIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+.alert-toast.error {
+    background: var(--danger-red);
+}
+
+@keyframes slideIn {
+    from { transform: translateX(120%); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+}
+
+footer {
+    margin-top: 80px;
+    color: #bbb;
+    font-size: 0.9rem;
+    padding-bottom: 20px;
+}
+
+/* ==========================================================================
+   📱 RWD 響應式斷點微調
+   ========================================================================== */
+@media (max-width: 600px) {
+    h1 { font-size: 2.2rem; }
+    .container { padding: 20px 15px; }
+    .config-panel { padding: 20px; }
+    .dashboard-header { flex-direction: column; gap: 15px; text-align: center; }
+    .dynamic-row { flex-direction: column; align-items: stretch; }
+    .guide-item { flex-direction: column; align-items: center; text-align: center; }
+    .guide-num { margin-right: 0; margin-bottom: 10px; }
+}

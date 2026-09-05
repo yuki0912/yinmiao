@@ -1,0 +1,18 @@
+<nav class="navbar navbar-expand-lg sticky-top mb-4">
+    <div class="container">
+        <a class="navbar-brand fs-3" href="/">🐾 <%= botName %></a>
+        <div class="d-flex align-items-center">
+            <% if (user) { %>
+                <span class="me-3 d-none d-md-inline small">你好，<%= user.username %> 喵！</span>
+                <a href="/logout" class="btn-logout me-2">登出</a>
+                <a href="/dashboard" class="btn-cute btn-dash py-2">
+                    <i class="fa-solid fa-gauge-high"></i> 控制台
+                </a>
+            <% } else { %>
+                <a href="/login" class="btn-cute">
+                    <i class="fa-brands fa-discord"></i> 登入 Discord
+                </a>
+            <% } %>
+        </div>
+    </div>
+</nav>

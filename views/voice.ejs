@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/png" href="<%= botAvatar %>">
+    <title>🔊 語音系統設定 | <%= botName %></title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=ZCOOL+KuaiLe&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        :root {
+            --primary-color: #FFC8DD;
+            --primary-hover: #FFAFCC;
+            --dark-pink: #FF7B9C;
+            --cat-orange: #FF9E5E;
+            --dark-color: #2B2D42;
+            --text-color: #4A4E69;
+            --bg-gradient: linear-gradient(135deg, #FFE5EC 0%, #F0E6FF 100%);
+            --delete-red: #FA5252;
+        }
+
+        body { 
+            background: var(--bg-gradient); 
+            font-family: 'Noto Sans TC', sans-serif;
+            color: var(--dark-color);
+            min-height: 100vh;
+        }
+
+        h1, h2, h3, .navbar-brand { font-family: 'ZCOOL KuaiLe', cursive; }
+        
+        .navbar { 
+            background: rgba(255, 255, 255, 0.45) !important; 
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.4); 
+        }
+        
+        .container-custom { max-width: 850px; margin: 40px auto; padding: 0 20px 60px; }
+        
+        /* 毛玻璃配置區塊 */
+        .config-section { 
+            background: rgba(255, 255, 255, 0.55); 
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            padding: 35px; 
+            border-radius: 24px; 
+            border: 1px solid rgba(255, 255, 255, 0.5); 
+            margin-bottom: 30px; 
+            box-shadow: 0 8px 32px 0 rgba(255, 183, 197, 0.12);
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+        .config-section:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 35px 0 rgba(255, 183, 197, 0.2);
+        }
+
+        .config-section h3 { 
+            color: var(--dark-pink); 
+            font-size: 1.4rem; 
+            margin-top: 0; 
+            display: flex; 
+            align-items: center; 
+            gap: 12px; 
+            border-bottom: 2px dashed rgba(255, 183, 197, 0.4); 
+            padding-bottom: 15px;
+            margin-bottom: 25px;
+        }
+        
+        /* 單一語音設定卡片項目 */
+        .voice-card {
+            background: rgba(255, 255, 255, 0.45);
+            border: 1px solid rgba(255, 255, 255, 0.6);
+            border-radius: 18px;
+            padding: 20px;
+            margin-bottom: 20px;
+            position: relative;
+            transition: all 0.3s ease;
+            animation: fadeIn 0.4s ease-out;
+        }
+        .voice-card:hover {
+            background: rgba(255, 255, 255, 0.75);
+            border-color: var(--primary-hover);
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .input-item { margin-bottom: 15px; }
+        label { display: block; font-weight: 700; color: var(--dark-color); margin-bottom: 8px; font-size: 0.95rem; }
+        
+        input[type="text"], input[type="number"], select { 
+            width: 100%; 
+            padding: 12px 14px; 
+            border-radius: 12px; 
+            border: 1px solid rgba(255, 183, 197, 0.5); 
+            font-family: inherit; 
+            box-sizing: border-box;
+            transition: all 0.3s ease; 
+            background-color: rgba(255, 255, 255, 0.7);
+            color: var(--dark-color);
+        }
+        input:focus, select:focus { 
+            background-color: white;
+            border-color: var(--dark-pink); 
+            outline: none; 
+            box-shadow: 0 0 0 4px rgba(255, 123, 156, 0.15);
+        }
+        
+        /* 移除卡片按鈕 */
+        .btn-remove-voice {
+            background: rgba(250, 82, 82, 0.1);
+            color: var(--delete-red);
+            border: 1px solid rgba(250, 82, 82, 0.2);
+            border-radius: 12px;
+            padding: 8px 14px;
+            font-size: 0.85rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .btn-remove-voice:hover {
+            background: var(--delete-red);
+            color: white;
+            transform: scale(1.02);
+        }
+
+        /* 新增母頻道按鈕 */
+        .btn-add-voice {
+            background: rgba(255, 255, 255, 0.6);
+            color: var(--dark-pink);
+            border: 2px dashed var(--primary-hover);
+            border-radius: 16px;
+            padding: 15px;
+            width: 100%;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 30px;
+        }
+        .btn-add-voice:hover {
+            background: white;
+            border-color: var(--dark-pink);
+            box-shadow: 0 6px 15px rgba(255, 183, 197, 0.15);
+        }
+
+        /* 儲存按鈕 */
+        .btn-save { 
+            background: linear-gradient(45deg, #FF7B9C, #A855F7); 
+            color: white; 
+            padding: 16px; 
+            border-radius: 50px;
+            width: 100%; 
+            border: none; 
+            font-size: 1.1rem; 
+            font-weight: 700; 
+            cursor: pointer;
+            transition: all 0.4s; 
+            box-shadow: 0 8px 25px rgba(255, 123, 156, 0.35);
+        }
+        .btn-save:hover { 
+            transform: translateY(-3px); 
+            box-shadow: 0 12px 30px rgba(168, 85, 247, 0.45);
+        }
+        .btn-save:active { transform: translateY(-1px); }
+        
+        code { background: rgba(255, 119, 154, 0.1); padding: 3px 8px; border-radius: 6px; font-family: monospace; color: #d63384; font-weight: 700; }
+        .help-text { font-size: 0.85rem; color: var(--text-color); opacity: 0.85; margin-top: 6px; line-height: 1.5; }
+        
+        /* 提示麵包屑 */
+        .tip-box {
+            background: rgba(255, 255, 255, 0.4);
+            border-left: 4px solid var(--cat-orange);
+            padding: 12px 18px;
+            border-radius: 0 12px 12px 0;
+            margin-bottom: 25px;
+            font-size: 0.9rem;
+            color: var(--text-color);
+        }
+    </style>
+</head>
+<body>
+
+<%- include('partials/navbar') %>
+
+<div class="container container-custom">
+    <div class="mb-4 mt-3">
+        <a href="/manage/<%= guildId %>" style="text-decoration: none; color: var(--dark-pink); font-weight: 500; display: inline-flex; align-items: center; gap: 6px;">
+            <i class="fa-solid fa-arrow-left"></i> 返回群組管理首頁
+        </a>
+    </div>
+
+    <header style="text-align: center; margin-bottom: 35px;">
+        <h1 style="color: var(--dark-pink); margin-bottom: 8px; font-size: 2.5rem;">🔊 語音包廂系統</h1>
+        <p style="color: var(--text-color); font-weight: 500;">正在設定伺服器：<span style="color: var(--dark-color); font-weight: 700;"><%= guildName %></span></p>
+    </header>
+
+    <div class="tip-box">
+        <h5>💡 銀喵小教室：什麼是動態語音？</h5>
+        <p class="mb-0">當成員點擊下方設定的<b>「語音母頻道」</b>時，銀喵會自動幫該成員建立一個全新的<b>專屬私人包廂</b>，並自動將他移動過去。當包廂內完全沒有人時，銀喵也會乖乖把空包廂刪除，幫伺服器省空間喵！</p>
+    </div>
+
+    <div class="config-section">
+        <h3><i class="fa-solid fa-microphone-lines"></i> 語音母頻道生成規則配置</h3>
+        
+        <div id="voiceSettingsContainer">
+            <% if (config.voiceSettings && config.voiceSettings.length > 0) { %>
+                <% config.voiceSettings.forEach(function(setting, index) { %>
+                    <div class="voice-card voice-setting-row">
+                        <div class="row align-items-end">
+                            <div class="col-md-5 input-item">
+                                <label>📍 選擇語音母頻道</label>
+                                <select class="voiceGeneratorId">
+                                    <option value="">-- 請選擇自動創房語音母體 --</option>
+                                    <% channels.forEach(function(channel) { %>
+                                        <option value="<%= channel.id %>" <%= setting.voiceGeneratorId === channel.id ? 'selected' : '' %>>
+                                            🔊 <%= channel.name %>
+                                        </option>
+                                    <% }); %>
+                                </select>
+                            </div>
+                            <div class="col-md-4 input-item">
+                                <label>✍️ 包廂自訂名稱</label>
+                                <input type="text" class="voiceNameTemplate" value="<%= setting.voiceNameTemplate || '專屬包廂' %>" placeholder="例如：專屬包廂">
+                            </div>
+                            <div class="col-md-3 input-item">
+                                <label>👥 人數限制 (0為不限)</label>
+                                <input type="number" class="voiceUserLimit" value="<%= setting.voiceUserLimit ?? 0 %>" min="0" max="99" placeholder="0">
+                            </div>
+                        </div>
+                        <div class="text-end mt-2">
+                            <button type="button" class="btn-remove-voice" onclick="removeVoiceCard(this)">
+                                <i class="fa-solid fa-trash-can"></i> 刪除此母頻道規則
+                            </button>
+                        </div>
+                    </div>
+                <% }); %>
+            <% } %>
+        </div>
+
+        <button type="button" class="btn-add-voice" onclick="addVoiceCard()">
+            <i class="fa-solid fa-circle-plus"></i> 添加新的語音母頻道規則 🐾
+        </button>
+        
+        <div class="help-text text-muted">
+            ℹ️ <b>自訂名稱提示：</b>銀喵在實際創建頻道時，會自動在前方附帶小腳印圖示，效果如：<code>🐾｜<%= config.voiceNameTemplate || '專屬包廂' %></code>。<br>
+            ℹ️ <b>人數上限：</b>可以設定限制 <code>0 到 99</code> 之間的任意數字，當滿人時其他成員將無法強行擠入包廂。
+        </div>
+    </div>
+
+    <button onclick="saveVoiceConfig()" class="btn-save">
+        <i class="fa-solid fa-paw"></i> 儲存多語音頻道設定 🐾
+    </button>
+    
+    <p id="status" style="text-align: center; margin-top: 20px; font-weight: 700; min-height: 1.5em; font-size: 1.05rem;"></p>
+</div>
+
+<%- include('partials/footer') %>
+
+<template id="voiceCardTemplate">
+    <div class="voice-card voice-setting-row">
+        <div class="row align-items-end">
+            <div class="col-md-5 input-item">
+                <label>📍 選擇語音母頻道</label>
+                <select class="voiceGeneratorId">
+                    <option value="" selected>-- 請選擇自動創房語音母體 --</option>
+                    <% channels.forEach(function(channel) { %>
+                        <option value="<%= channel.id %>">🔊 <%= channel.name %></option>
+                    <% }); %>
+                </select>
+            </div>
+            <div class="col-md-4 input-item">
+                <label>✍️ 包廂自訂名稱</label>
+                <input type="text" class="voiceNameTemplate" value="GAME VC" placeholder="例如：GAME VC">
+            </div>
+            <div class="col-md-3 input-item">
+                <label>👥 人數限制 (0為不限)</label>
+                <input type="number" class="voiceUserLimit" value="0" min="0" max="99" placeholder="0">
+            </div>
+        </div>
+        <div class="text-end mt-2">
+            <button type="button" class="btn-remove-voice" onclick="removeVoiceCard(this)">
+                <i class="fa-solid fa-trash-can"></i> 刪除此母頻道規則
+            </button>
+        </div>
+    </div>
+</template>
+
+<script>
+    // ➕ JS功能：動態新增一個母頻道設定卡片
+    function addVoiceCard() {
+        const container = document.getElementById('voiceSettingsContainer');
+        const template = document.getElementById('voiceCardTemplate');
+        const clone = template.content.cloneNode(true);
+        container.appendChild(clone);
+    }
+
+    // 🗑️ JS功能：動態刪除指定的母頻道設定卡片
+    function removeVoiceCard(button) {
+        const card = button.closest('.voice-card');
+        if (card) {
+            card.style.opacity = '0';
+            card.style.transform = 'translateY(10px)';
+            setTimeout(() => { card.remove(); }, 300); // 留給淡出動畫反應時間
+        }
+    }
+
+    // 💾 核心儲存功能：打包收集所有動態卡片，丟給後端 API
+    async function saveVoiceConfig() {
+        const status = document.getElementById('status');
+        const rows = document.querySelectorAll('.voice-setting-row');
+        const voiceSettings = [];
+
+        // 遞迴遍歷畫面上目前所有的卡片資料
+        rows.forEach(row => {
+            const voiceGeneratorId = row.querySelector('.voiceGeneratorId').value;
+            const voiceNameTemplate = row.querySelector('.voiceNameTemplate').value;
+            const voiceUserLimit = row.querySelector('.voiceUserLimit').value;
+
+            // 只有當使用者確實有選擇語音頻道，才塞入陣列儲存
+            if (voiceGeneratorId && voiceGeneratorId.trim() !== '') {
+                voiceSettings.push({
+                    voiceGeneratorId: voiceGeneratorId,
+                    voiceNameTemplate: voiceNameTemplate ? voiceNameTemplate.trim() : '專屬包廂',
+                    voiceUserLimit: parseInt(voiceUserLimit, 10) >= 0 ? parseInt(voiceUserLimit, 10) : 0
+                });
+            }
+        });
+
+        const payload = {
+            guildId: "<%= guildId %>",
+            voiceSettings: voiceSettings // 這會啟動後台的 isVoiceForm 區塊檢查
+        };
+
+        status.innerText = "⏳ 正在將動態語音架構同步至銀喵大腦中...";
+        status.style.color = "var(--text-color)";
+        
+        try {
+            const res = await fetch('/api/save-config', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            const result = await res.json();
+            
+            if (result.status === 'success') {
+                status.innerText = "✨ 喵！多組動態語音頻道已成功與資料庫完美同步儲存囉！";
+                status.style.color = "#2ecc71";
+                setTimeout(() => { status.innerText = ""; }, 4000);
+            } else {
+                status.innerText = "❌ 儲存失敗了喵：" + result.message;
+                status.style.color = "#e74c3c";
+            }
+        } catch (e) {
+            status.innerText = "❌ 糟糕，與後端通訊時發生異常，請確認伺服器程序喵！";
+            status.style.color = "#e74c3c";
+        }
+    }
+
+    // 🚀 初始化檢查：如果當前沒有任何設定，則預設生出一個空白卡片給使用者操作
+    document.addEventListener("DOMContentLoaded", function() {
+        const container = document.getElementById('voiceSettingsContainer');
+        if (container && container.children.length === 0) {
+            addVoiceCard();
+        }
+    });
+</script>
+</body>
+</html>

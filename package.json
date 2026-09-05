@@ -1,0 +1,41 @@
+{
+  "name": "yinmiao",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "@discordjs/voice": "^0.19.2",
+    "@distube/soundcloud": "^2.0.4",
+    "@distube/spotify": "^2.0.2",
+    "@distube/youtube": "^1.0.4",
+    "@napi-rs/canvas": "^1.0.2",
+    "@snazzah/davey": "^0.1.12",
+    "axios": "^1.15.0",
+    "canvas": "^3.2.3",
+    "cli-table3": "^0.6.5",
+    "colors": "^1.4.0",
+    "connect-mongo": "^5.1.0",
+    "cors": "^2.8.6",
+    "discord-oauth2": "^2.11.0",
+    "discord.js": "^14.27.0",
+    "dotenv": "^17.4.2",
+    "ejs": "^3.1.9",
+    "express": "^4.18.3",
+    "express-session": "^1.18.0",
+    "google-translate-api-x": "^10.7.2",
+    "mongodb": "^6.21.0",
+    "mongoose": "^8.2.0",
+    "node-cron": "^4.6.0",
+    "opusscript": "^0.0.8",
+    "play-dl": "^1.9.7",
+    "random-anime": "^1.0.6"
+  }
+}

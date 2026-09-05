@@ -1,0 +1,813 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/png" href="<%= botAvatar %>">
+    <title>規則設定 | <%= botName %></title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- 引入最新版 Emoji Mart 表情選擇器 -->
+    <script src="https://cdn.jsdelivr.net/npm/emoji-mart@latest/dist/browser.js"></script>
+
+    <style>
+        :root {
+            --primary-color: #FFC8DD;
+            --primary-hover: #FFAFCC;
+            --dark-pink: #FF7B9C;
+            --dark-color: #2B2D42;
+            --text-color: #4A4E69;
+            --bg-gradient: linear-gradient(135deg, #FFE5EC 0%, #F0E6FF 100%);
+        }
+
+        body {
+            background: var(--bg-gradient);
+            font-family: 'Noto Sans TC', sans-serif;
+            color: var(--dark-color);
+            min-height: 100vh;
+        }
+
+        .config-box {
+            background: rgba(255, 255, 255, 0.55);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.5);
+            border-radius: 24px;
+            padding: 30px;
+            box-shadow: 0 8px 32px 0 rgba(255, 183, 197, 0.12);
+        }
+
+        h2 {
+            font-weight: 900;
+            color: var(--dark-color);
+        }
+
+        .form-label {
+            font-weight: 700;
+            color: var(--dark-color);
+            margin-top: 5px;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.95rem;
+        }
+
+        .form-control,
+        .form-select {
+            width: 100%;
+            padding: 12px;
+            border-radius: 12px;
+            border: 1px solid rgba(255, 183, 197, 0.5);
+            background-color: rgba(255, 255, 255, 0.7);
+            color: var(--dark-color);
+            transition: all 0.3s ease;
+        }
+
+        .form-control:focus,
+        .form-select:focus {
+            background-color: white;
+            border-color: var(--dark-pink);
+            box-shadow: 0 0 0 4px rgba(255, 123, 156, 0.15);
+            outline: none;
+        }
+
+        .form-control-color {
+            padding: 6px;
+            height: 48px;
+            cursor: pointer;
+        }
+
+        .embed-sub-card {
+            background: rgba(255, 255, 255, 0.4);
+            border: 1px solid rgba(255, 183, 197, 0.3);
+            border-radius: 16px;
+            padding: 18px;
+            margin-bottom: 18px;
+        }
+
+        .embed-card-title {
+            font-size: 0.85rem;
+            color: var(--dark-pink);
+            font-weight: 800;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            text-transform: uppercase;
+        }
+
+        .emoji-input-group {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+
+        .btn-emoji-picker {
+            position: absolute;
+            right: 8px;
+            background: rgba(255, 255, 255, 0.8);
+            border: 1px solid rgba(255, 183, 197, 0.4);
+            border-radius: 10px;
+            padding: 4px 10px;
+            color: #fd7e14;
+            cursor: pointer;
+            z-index: 10;
+        }
+
+        #pickerContainer {
+            position: absolute;
+            right: 0;
+            top: 50px;
+            z-index: 9999;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+            border-radius: 14px;
+            display: none;
+        }
+
+        .section-divider {
+            margin: 35px 0 25px 0;
+            border-top: 2px dashed rgba(255, 123, 156, 0.35);
+            position: relative;
+        }
+
+        .section-label {
+            position: absolute;
+            top: -14px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(255, 255, 255, 0.85);
+            padding: 2px 15px;
+            color: var(--dark-pink);
+            font-weight: 700;
+            font-size: 0.8rem;
+            border-radius: 50px;
+            white-space: nowrap;
+        }
+
+        .bind-container {
+            background: rgba(77, 173, 247, 0.06);
+            border-left: 5px solid #4dadf7;
+            padding: 18px;
+            border-radius: 14px;
+            margin-bottom: 20px;
+        }
+
+        #new-message-fields {
+            transition: all 0.4s ease-in-out;
+            max-height: 2500px;
+            opacity: 1;
+            overflow: hidden;
+        }
+
+        #new-message-fields.hide-fields {
+            max-height: 0;
+            opacity: 0;
+            margin-bottom: 0 !important;
+        }
+
+        .btn-save {
+            background: linear-gradient(45deg, #FF7B9C, #A855F7);
+            border: none;
+            color: white;
+            font-weight: 700;
+            font-size: 1.1rem;
+            padding: 14px;
+            border-radius: 50px;
+            box-shadow: 0 6px 20px rgba(255, 123, 156, 0.35);
+            transition: all 0.3s;
+        }
+
+        .btn-save:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(168, 85, 247, 0.45);
+            color: white;
+        }
+
+        .back-link {
+            text-decoration: none;
+            color: var(--text-color);
+            font-weight: 500;
+            padding: 6px 14px;
+            border-radius: 50px;
+            background: rgba(255, 255, 255, 0.4);
+            border: 1px solid rgba(255, 255, 255, 0.4);
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .hint-text {
+            font-size: 0.82rem;
+            color: var(--text-color);
+            opacity: 0.75;
+            margin-top: 4px;
+        }
+
+        textarea {
+            resize: vertical;
+            min-height: 110px;
+        }
+
+        /* 🐾 Discord 擬真預覽看板樣式 🐾 */
+        .preview-sticky-container {
+            position: sticky;
+            top: 25px;
+            align-self: flex-start;
+        }
+
+        .discord-window-header {
+            background-color: #1e1f22;
+            color: #dbdee1;
+            padding: 12px 18px;
+            border-top-left-radius: 16px;
+            border-top-right-radius: 16px;
+            font-weight: 700;
+            font-size: 0.9rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            border-bottom: 1px solid #2b2d31;
+        }
+
+        .discord-chat-window {
+            background-color: #313338;
+            padding: 20px;
+            border-bottom-left-radius: 16px;
+            border-bottom-right-radius: 16px;
+            box-shadow: 0 12px 32px rgba(0, 0, 0, 0.25);
+        }
+
+        .discord-message-row {
+            display: flex;
+            gap: 12px;
+        }
+
+        .discord-username {
+            color: #f2f3f5;
+            font-weight: 700;
+            font-size: 0.95rem;
+        }
+
+        .discord-bot-tag {
+            background-color: #5865f2;
+            color: #ffffff;
+            font-size: 0.65rem;
+            font-weight: 700;
+            padding: 2px 5px;
+            border-radius: 4px;
+            margin-left: 4px;
+            vertical-align: middle;
+        }
+
+        .discord-timestamp {
+            color: #949ba4;
+            font-size: 0.72rem;
+            margin-left: 6px;
+        }
+
+        .discord-embed-container {
+            margin-top: 8px;
+            background-color: #2b2d31;
+            border-left: 4px solid #FFC8DD;
+            border-radius: 4px;
+            padding: 12px 16px;
+            display: flex;
+            justify-content: space-between;
+            max-width: 520px;
+        }
+
+        .discord-embed-main {
+            flex: 1;
+        }
+
+        .discord-embed-author {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 6px;
+        }
+
+        .discord-embed-author-icon {
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            object-fit: cover;
+        }
+
+        .discord-embed-author-name {
+            color: #ffffff;
+            font-size: 0.82rem;
+            font-weight: 700;
+            text-decoration: none;
+        }
+
+        .discord-embed-title {
+            color: #ffffff;
+            font-weight: 700;
+            font-size: 1rem;
+            margin-bottom: 6px;
+        }
+
+        .discord-embed-description {
+            color: #dbdee1;
+            font-size: 0.88rem;
+            line-height: 1.35;
+            word-break: break-word;
+            margin-bottom: 10px;
+        }
+
+        .discord-embed-image {
+            max-width: 100%;
+            border-radius: 8px;
+            margin-top: 8px;
+        }
+
+        .discord-embed-thumbnail {
+            width: 80px;
+            height: 80px;
+            border-radius: 6px;
+            object-fit: cover;
+            margin-left: 16px;
+        }
+
+        .discord-embed-footer {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            color: #949ba4;
+            font-size: 0.75rem;
+            margin-top: 8px;
+        }
+
+        .discord-embed-footer-icon {
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            object-fit: cover;
+        }
+
+        .discord-reaction-row {
+            display: flex;
+            gap: 6px;
+            margin-top: 8px;
+            padding-left: 20px;
+        }
+
+        .discord-reaction-pill {
+            background-color: #2b2d31;
+            border: 1px solid #35373c;
+            border-radius: 8px;
+            padding: 4px 10px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            color: #dbdee1;
+            font-size: 0.85rem;
+        }
+
+        .discord-reaction-count {
+            color: #b5bac1;
+            font-weight: 700;
+            font-size: 0.8rem;
+        }
+    </style>
+</head>
+
+<body>
+
+    <%- include('partials/navbar') %>
+
+        <div class="container-fluid px-lg-5 py-5">
+            <div class="row g-4">
+
+                <!-- 左側：設定控制面板區 -->
+                <div class="col-lg-7">
+                    <div class="mb-4 d-flex justify-content-between align-items-center flex-wrap gap-3">
+                        <div>
+                            <h2>📜 規則驗證核心配置</h2>
+                            <div class="text-muted small mt-1">
+                                伺服器：<span class="text-dark fw-bold">
+                                    <%= typeof guildName !=='undefined' && guildName ? guildName : '指定 Discord 伺服器' %>
+                                </span>
+                            </div>
+                        </div>
+                        <a href="/manage/<%= guildId %>" class="back-link">
+                            <i class="fa-solid fa-arrow-left"></i> 返回群組管理
+                        </a>
+                    </div>
+
+                    <div class="config-box">
+                        <!-- 核心設定：目標頻道 -->
+                        <div class="mb-4">
+                            <label class="form-label"><i class="fa-solid fa-location-dot" style="color: #ff6b6b;"></i>
+                                目標發送頻道</label>
+                            <select id="rulesChannelId" class="form-select">
+                                <option value="">-- 請選擇用於規則認證的頻道 --</option>
+                                <% channels.forEach(ch=> { %>
+                                    <option value="<%= ch.id %>" <%=config.rulesChannelId===ch.id ? 'selected' : '' %>>#
+                                        <%= ch.name %>
+                                    </option>
+                                    <% }) %>
+                            </select>
+                        </div>
+
+                        <!-- 核心設定：身分組 -->
+                        <div class="mb-4">
+                            <label class="form-label"><i class="fa-solid fa-user-tag" style="color: #fcc419;"></i>
+                                驗證通過授權身分組</label>
+                            <select id="rulesRoleId" class="form-select">
+                                <option value="">-- 請選擇認證成功給予的身分組 --</option>
+                                <% roles.forEach(role=> { %>
+                                    <option value="<%= role.id %>" <%=config.rulesRoleId===role.id ? 'selected' : '' %>>
+                                        <%= role.name %>
+                                    </option>
+                                    <% }) %>
+                            </select>
+                        </div>
+
+                        <!-- 核心設定：表情符號 -->
+                        <div class="mb-4" style="position: relative;">
+                            <label class="form-label"><i class="fa-solid fa-face-smile" style="color: #fd7e14;"></i>
+                                認證點擊的表情符號 (Emoji)</label>
+                            <div class="emoji-input-group">
+                                <input type="text" id="rulesEmoji" class="form-control" placeholder="請輸入點擊的表情"
+                                    value="<%= config.rulesEmoji || '✅' %>" style="padding-right: 65px;">
+                                <button type="button" id="emojiPickerBtn" class="btn btn-emoji-picker">
+                                    <i class="fa-regular fa-face-smile-wink fs-5"></i>
+                                </button>
+                            </div>
+                            <div id="pickerContainer"></div>
+                        </div>
+
+                        <div class="section-divider">
+                            <span class="section-label" id="dividerLabel">二選一：綁定既有訊息 或 自訂精美新規則卡片</span>
+                        </div>
+
+                        <!-- 綁定現有訊息 ID -->
+                        <div class="bind-container">
+                            <label class="form-label mt-0" style="color: #2b8ad6;"><i class="fa-solid fa-link"></i> 綁定現有
+                                Discord 訊息 ID (選填)</label>
+                            <input type="text" id="rulesMessageId" class="form-control"
+                                placeholder="請貼上該頻道內已存在的特定訊息 ID..." value="<%= config.rulesMessageId || '' %>">
+                        </div>
+
+                        <!-- Embed 進階編輯表單 -->
+                        <div id="new-message-fields">
+
+                            <div class="embed-sub-card">
+                                <span class="embed-card-title"><i class="fa-solid fa-file-lines"></i> 核心內容區塊</span>
+                                <div class="mb-3">
+                                    <label class="form-label small text-muted">卡片大標題 (Title)</label>
+                                    <input type="text" id="rulesTitle" class="form-control"
+                                        placeholder="例如：📜 歡迎蒞臨本伺服器！" value="<%= config.rulesTitle || '' %>">
+                                </div>
+                                <div class="mb-0">
+                                    <label class="form-label small text-muted">詳細群規內容 (Description)</label>
+                                    <textarea id="rulesDescription" class="form-control"
+                                        placeholder="請輸入詳細群規..."><%= config.rulesDescription || '' %></textarea>
+                                </div>
+                            </div>
+
+                            <div class="embed-sub-card">
+                                <span class="embed-card-title"><i class="fa-solid fa-sliders"></i> 風格與外觀視覺</span>
+                                <div class="row g-3">
+                                    <div class="col-sm-6">
+                                        <label class="form-label small text-muted">Embed 側邊主題顏色 (Color)</label>
+                                        <input type="color" id="rulesEmbedColor" class="form-control form-control-color"
+                                            value="<%= config.rulesEmbedColor || '#FFC8DD' %>">
+                                    </div>
+                                    <div class="col-sm-6 d-flex align-items-center">
+                                        <div class="form-check form-switch mt-3 ms-2">
+                                            <input class="form-check-input" type="checkbox" id="embedTimestamp"
+                                                <%=config.embedTimestamp ? 'checked' : '' %>>
+                                            <label class="form-check-label fw-bold small text-muted"
+                                                for="embedTimestamp">顯示發佈時間戳記 (Timestamp)</label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="embed-sub-card">
+                                <span class="embed-card-title"><i class="fa-solid fa-user-pen"></i> 作者資訊欄位
+                                    (Author)</span>
+                                <div class="row g-3">
+                                    <div class="col-md-4">
+                                        <label class="form-label small text-muted">作者名稱</label>
+                                        <input type="text" id="embedAuthorName" class="form-control"
+                                            value="<%= config.embedAuthorName || '' %>">
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label small text-muted">作者頭像連結</label>
+                                        <input type="url" id="embedAuthorIcon" class="form-control"
+                                            value="<%= config.embedAuthorIcon || '' %>">
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label small text-muted">作者跳轉網址</label>
+                                        <input type="url" id="embedAuthorUrl" class="form-control"
+                                            value="<%= config.embedAuthorUrl || '' %>">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="embed-sub-card">
+                                <span class="embed-card-title"><i class="fa-solid fa-images"></i> 媒體素材元件 (Image &
+                                    Thumbnail)</span>
+                                <div class="row g-3">
+                                    <div class="col-md-6">
+                                        <label class="form-label small text-muted">右上角小縮圖連結</label>
+                                        <input type="url" id="embedThumbnail" class="form-control"
+                                            value="<%= config.embedThumbnail || '' %>">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label small text-muted">底部滿版大封面連結</label>
+                                        <input type="url" id="embedImage" class="form-control"
+                                            value="<%= config.embedImage || '' %>">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="embed-sub-card">
+                                <span class="embed-card-title"><i class="fa-solid fa-window-minimize"></i> 頁尾宣告欄位
+                                    (Footer)</span>
+                                <div class="row g-3">
+                                    <div class="col-md-6">
+                                        <label class="form-label small text-muted">頁尾純文字內容</label>
+                                        <input type="text" id="embedFooterText" class="form-control"
+                                            value="<%= config.embedFooterText || '點擊下方反應即可通過驗證喵 🐾' %>">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label small text-muted">頁尾左側小圖標連結</label>
+                                        <input type="url" id="embedFooterIcon" class="form-control"
+                                            value="<%= config.embedFooterIcon || '' %>">
+                                    </div>
+                                </div>
+                            </div>
+
+                        </div>
+
+                        <button onclick="saveConfig()" class="btn btn-save w-100 mt-3">
+                            <i class="fa-solid fa-cloud-arrow-up me-2"></i> 儲存並部署最新配置 🐾
+                        </button>
+                        <div id="msg" class="mt-3 text-center fw-bold" style="min-height: 24px;"></div>
+                    </div>
+                </div>
+
+                <!-- 右側：隨視窗捲動的 Discord 實時外觀預覽看板 -->
+                <div class="col-lg-5 preview-sticky-container">
+                    <div class="discord-window-header">
+                        <i class="fa-brands fa-discord fs-5 text-primary"></i> Discord 終端外觀即時預覽 Mockup
+                    </div>
+
+                    <div class="discord-chat-window">
+                        <div class="discord-message-row">
+                            <div class="w-100">
+                                <div>
+                                    <span class="discord-username">
+                                        <%= botName %>
+                                    </span>
+                                    <span class="discord-bot-tag">BOT</span>
+                                    <span class="discord-timestamp">今天下午 12:00</span>
+                                </div>
+
+                                <div id="discordEmbed" class="discord-embed-container">
+                                    <div class="discord-embed-main">
+
+                                        <div id="pAuthorZone" class="discord-embed-author" style="display: none;">
+                                            <img id="pAuthorIcon" class="discord-embed-author-icon" src=""
+                                                style="display: none;">
+                                            <a id="pAuthorName" class="discord-embed-author-name" target="_blank"></a>
+                                        </div>
+
+                                        <div id="pTitle" class="discord-embed-title">📜 伺服器守則</div>
+
+                                        <div id="pDesc" class="discord-embed-description">請遵守本群組規範。</div>
+
+                                        <img id="pMainImage" class="discord-embed-image" src="" style="display: none;">
+
+                                        <div id="pFooterZone" class="discord-embed-footer">
+                                            <img id="pFooterIcon" class="discord-embed-footer-icon" src=""
+                                                style="display: none;">
+                                            <span id="pFooterText">點擊下方反應即可通過驗證喵 🐾</span>
+                                            <span id="pTimestamp" style="display: none;">• 今天下午 12:00</span>
+                                        </div>
+
+                                    </div>
+                                    <img id="pThumbnail" class="discord-embed-thumbnail" src="" style="display: none;">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="discord-reaction-row">
+                            <div class="discord-reaction-pill">
+                                <span id="pReactionEmoji">✅</span>
+                                <span class="discord-reaction-count">1</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <%- include('partials/footer') %>
+
+            <script>
+                const msgIdInput = document.getElementById('rulesMessageId');
+                const newFieldsZone = document.getElementById('new-message-fields');
+                const dividerLabel = document.getElementById('dividerLabel');
+                const emojiInput = document.getElementById('rulesEmoji');
+                const pickerButton = document.getElementById('emojiPickerBtn');
+                const pickerContainer = document.getElementById('pickerContainer');
+
+                // Live Preview 實時渲染邏輯核心函式
+                function renderDiscordPreview() {
+                    const hasMsgId = msgIdInput.value.trim().length > 0;
+                    const embedWrapper = document.getElementById('discordEmbed');
+
+                    if (hasMsgId) {
+                        embedWrapper.style.display = 'none';
+                        document.getElementById('pReactionEmoji').innerText = emojiInput.value.trim() || '✅';
+                        return;
+                    }
+                    embedWrapper.style.display = 'flex';
+
+                    // 🟢 1. 同步守則邊框顏色
+                    const colorVal = document.getElementById('rulesEmbedColor').value;
+                    embedWrapper.style.borderLeftColor = colorVal;
+
+                    // 2. 同步作者欄位
+                    const authorName = document.getElementById('embedAuthorName').value.trim();
+                    const authorIcon = document.getElementById('embedAuthorIcon').value.trim();
+                    const authorUrl = document.getElementById('embedAuthorUrl').value.trim();
+                    const authorZone = document.getElementById('pAuthorZone');
+                    const pAuthorName = document.getElementById('pAuthorName');
+                    const pAuthorIcon = document.getElementById('pAuthorIcon');
+
+                    if (authorName) {
+                        authorZone.style.display = 'flex';
+                        pAuthorName.innerText = authorName;
+                        if (authorUrl) pAuthorName.href = authorUrl; else pAuthorName.removeAttribute('href');
+                        if (authorIcon) { pAuthorIcon.src = authorIcon; pAuthorIcon.style.display = 'block'; } else { pAuthorIcon.style.display = 'none'; }
+                    } else {
+                        authorZone.style.display = 'none';
+                    }
+
+                    // 3. 同步標題與內文
+                    const titleText = document.getElementById('rulesTitle').value.trim();
+                    const descText = document.getElementById('rulesDescription').value;
+
+                    document.getElementById('pTitle').innerText = titleText || "📜 伺服器守則";
+
+                    let formattedDesc = descText || "請遵守本群組規範。";
+                    formattedDesc = formattedDesc
+                        .replace(/\n/g, '<br>')
+                        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+                    document.getElementById('pDesc').innerHTML = formattedDesc;
+
+                    // 4. 同步媒體圖片
+                    const thumbUrl = document.getElementById('embedThumbnail').value.trim();
+                    const imgUrl = document.getElementById('embedImage').value.trim();
+                    const pThumb = document.getElementById('pThumbnail');
+                    const pImg = document.getElementById('pMainImage');
+
+                    if (thumbUrl) { pThumb.src = thumbUrl; pThumb.style.display = 'block'; } else { pThumb.style.display = 'none'; }
+                    if (imgUrl) { pImg.src = imgUrl; pImg.style.display = 'block'; } else { pImg.style.display = 'none'; }
+
+                    // 5. 同步頁尾與時間戳記
+                    const footerText = document.getElementById('embedFooterText').value.trim();
+                    const footerIcon = document.getElementById('embedFooterIcon').value.trim();
+                    const showTimestamp = document.getElementById('embedTimestamp').checked;
+                    const pFooterIcon = document.getElementById('pFooterIcon');
+                    const pTimestamp = document.getElementById('pTimestamp');
+
+                    document.getElementById('pFooterText').innerText = footerText || "點擊下方反應即可通過驗證喵 🐾";
+                    if (footerIcon) { pFooterIcon.src = footerIcon; pFooterIcon.style.display = 'block'; } else { pFooterIcon.style.display = 'none'; }
+                    if (showTimestamp) pTimestamp.style.display = 'inline'; else pTimestamp.style.display = 'none';
+
+                    // 6. 同步下方獨立的 Reaction 按鈕
+                    document.getElementById('pReactionEmoji').innerText = emojiInput.value.trim() || '✅';
+                }
+
+                // 初始化 EmojiMart 選擇器
+                window.addEventListener('DOMContentLoaded', () => {
+                    try {
+                        new EmojiMart.Picker({
+                            parent: pickerContainer,
+                            locale: 'zh',
+                            set: 'native',
+                            onEmojiSelect: (emoji) => {
+                                if (emoji && emoji.native) {
+                                    emojiInput.value = emoji.native;
+                                    renderDiscordPreview();
+                                }
+                                pickerContainer.style.display = 'none';
+                            }
+                        });
+
+                        pickerButton.addEventListener('click', (e) => {
+                            e.preventDefault(); e.stopPropagation();
+                            const isHidden = pickerContainer.style.display === 'none' || pickerContainer.style.display === '';
+                            pickerContainer.style.display = isHidden ? 'block' : 'none';
+                        });
+
+                        document.addEventListener('click', (e) => {
+                            if (!pickerContainer.contains(e.target) && e.target !== pickerButton && !pickerButton.contains(e.target)) {
+                                pickerContainer.style.display = 'none';
+                            }
+                        });
+                    } catch (err) {
+                        console.error("💥 Emoji Mart 元件初始化發生異常：", err);
+                    }
+
+                    const allInputs = document.querySelectorAll('.config-box input, .config-box textarea, .config-box select');
+                    allInputs.forEach(input => {
+                        input.addEventListener('input', renderDiscordPreview);
+                        input.addEventListener('change', renderDiscordPreview);
+                    });
+                });
+
+                function toggleFields() {
+                    const hasId = msgIdInput.value.trim().length > 0;
+                    if (hasId) {
+                        newFieldsZone.classList.add('hide-fields');
+                        dividerLabel.innerText = "已啟用：「訊息 ID 綁定模式」🐾";
+                        dividerLabel.style.color = "#2b8ad6";
+                    } else {
+                        newFieldsZone.classList.remove('hide-fields');
+                        dividerLabel.innerText = "二選一：綁定既有訊息 或 自訂精美新規則卡片";
+                        dividerLabel.style.color = "var(--dark-pink)";
+                    }
+                    renderDiscordPreview();
+                }
+
+                msgIdInput.addEventListener('input', toggleFields);
+                window.addEventListener('load', toggleFields);
+
+                // 儲存至後端資料庫
+                async function saveConfig() {
+                    const msgStatus = document.getElementById('msg');
+
+                    if (!document.getElementById('rulesChannelId').value || !document.getElementById('rulesRoleId').value) {
+                        msgStatus.innerHTML = `<span style="color: #e74c3c;">❌ 喵嗚！目標頻道與授權身分組是必填項目，不能空著喔！</span>`;
+                        return;
+                    }
+
+                    let selectedEmoji = emojiInput.value.trim();
+                    if (!selectedEmoji) {
+                        selectedEmoji = '✅';
+                        emojiInput.value = '✅';
+                    }
+
+                    const data = {
+                        guildId: "<%= guildId %>",
+                        rulesChannelId: document.getElementById('rulesChannelId').value,
+                        rulesRoleId: document.getElementById('rulesRoleId').value,
+                        rulesEmoji: selectedEmoji,
+                        rulesMessageId: msgIdInput.value.trim(),
+
+                        rulesTitle: document.getElementById('rulesTitle').value.trim(),
+                        rulesDescription: document.getElementById('rulesDescription').value.trim(),
+
+                        rulesEmbedColor: document.getElementById('rulesEmbedColor').value,
+                        embedTimestamp: document.getElementById('embedTimestamp').checked,
+
+                        embedAuthorName: document.getElementById('embedAuthorName').value.trim(),
+                        embedAuthorIcon: document.getElementById('embedAuthorIcon').value.trim(),
+                        embedAuthorUrl: document.getElementById('embedAuthorUrl').value.trim(),
+
+                        embedThumbnail: document.getElementById('embedThumbnail').value.trim(),
+                        embedImage: document.getElementById('embedImage').value.trim(),
+
+                        embedFooterText: document.getElementById('embedFooterText').value.trim(),
+                        embedFooterIcon: document.getElementById('embedFooterIcon').value.trim()
+                    };
+
+                    msgStatus.style.color = "var(--text-color)";
+                    msgStatus.innerText = "⏳ 銀喵正在全速搬運配置資料並部署中...";
+
+                    try {
+                        const res = await fetch('/api/save-config', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(data)
+                        });
+                        const result = await res.json();
+
+                        if (result.status === 'success') {
+                            msgStatus.innerHTML = `<span style="color: #2ecc71;">✨ 喵！規則認證機制與自訂進階 Embed 已完美同步至 Discord 囉！</span>`;
+                            setTimeout(() => { msgStatus.innerText = ""; }, 4000);
+                        } else {
+                            msgStatus.innerHTML = `<span style="color: #e74c3c;">❌ 部署失敗了喵：${result.message}</span>`;
+                        }
+                    } catch (err) {
+                        msgStatus.innerHTML = `<span style="color: #e74c3c;">💥 喵嗚！連線到後端時發生錯誤：${err.message}</span>`;
+                    }
+                }
+            </script>
+</body>
+
+</html>

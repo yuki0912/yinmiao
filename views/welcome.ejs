@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/png" href="<%= botAvatar %>">
+    <title>🎨 歡迎與離開系統設定 | <%= botName %></title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=ZCOOL+KuaiLe&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <style>
+        :root {
+            --primary-color: #FFC8DD;
+            --primary-hover: #FFAFCC;
+            --dark-pink: #FF7B9C;
+            --cat-orange: #FF9E5E;
+            --dark-color: #2B2D42;
+            --text-color: #4A4E69;
+            --bg-gradient: linear-gradient(135deg, #FFE5EC 0%, #F0E6FF 100%);
+            --leave-gray: #A0AEC0;
+        }
+
+        body {
+            background: var(--bg-gradient);
+            font-family: 'Noto Sans TC', sans-serif;
+            color: var(--dark-color);
+            min-height: 100vh;
+        }
+
+        h1, h2, h3, .navbar-brand {
+            font-family: 'ZCOOL KuaiLe', cursive;
+        }
+
+        .navbar {
+            background: rgba(255, 255, 255, 0.45) !important;
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.4);
+        }
+
+        .container-custom {
+            max-width: 850px;
+            margin: 40px auto;
+            padding: 0 20px 60px;
+        }
+
+        .config-section {
+            background: rgba(255, 255, 255, 0.55);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            padding: 35px;
+            border-radius: 24px;
+            border: 1px solid rgba(255, 255, 255, 0.5);
+            margin-bottom: 30px;
+            box-shadow: 0 8px 32px 0 rgba(255, 183, 197, 0.12);
+            transition: transform 0.3s;
+        }
+
+        .config-section:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 35px 0 rgba(255, 183, 197, 0.2);
+        }
+
+        .config-section h3 {
+            color: var(--dark-pink);
+            font-size: 1.4rem;
+            margin-top: 0;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            border-bottom: 2px dashed rgba(255, 183, 197, 0.4);
+            padding-bottom: 15px;
+            margin-bottom: 25px;
+        }
+
+        .config-section.leave-section h3 {
+            color: #718096;
+            border-bottom-color: rgba(160, 174, 192, 0.4);
+        }
+
+        .input-item {
+            margin-bottom: 22px;
+        }
+
+        label {
+            display: block;
+            font-weight: 700;
+            color: var(--dark-color);
+            margin-bottom: 10px;
+            font-size: 0.95rem;
+        }
+
+        input[type="text"], select, textarea {
+            width: 100%;
+            padding: 14px;
+            border-radius: 14px;
+            border: 1px solid rgba(255, 183, 197, 0.5);
+            font-family: inherit;
+            box-sizing: border-box;
+            transition: all 0.3s ease;
+            background-color: rgba(255, 255, 255, 0.7);
+            color: var(--dark-color);
+        }
+
+        input:focus, select:focus, textarea:focus {
+            background-color: white;
+            border-color: var(--dark-pink);
+            outline: none;
+            box-shadow: 0 0 0 4px rgba(255, 123, 156, 0.15);
+        }
+
+        .checkbox-group {
+            background: rgba(255, 255, 255, 0.4);
+            padding: 16px 20px;
+            border-radius: 14px;
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            cursor: pointer;
+            margin-bottom: 20px;
+            transition: all 0.2s;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            user-select: none;
+        }
+
+        .checkbox-group:hover {
+            background: rgba(255, 255, 255, 0.8);
+            border-color: var(--primary-hover);
+        }
+
+        .checkbox-group input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+            accent-color: var(--dark-pink);
+            cursor: pointer;
+        }
+
+        input[type="color"] {
+            appearance: none;
+            border: 3px solid white;
+            border-radius: 50px;
+            width: 48px;
+            height: 48px;
+            padding: 0;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+            transition: transform 0.2s;
+        }
+
+        input[type="color"]:hover {
+            transform: scale(1.1);
+        }
+
+        input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
+        input[type="color"]::-webkit-color-swatch { border: none; border-radius: 50px; }
+
+        .btn-save {
+            background: linear-gradient(45deg, #FF7B9C, #A855F7);
+            color: white;
+            padding: 16px;
+            border-radius: 50px;
+            width: 100%;
+            border: none;
+            font-size: 1.1rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.4s;
+            box-shadow: 0 8px 25px rgba(255, 123, 156, 0.35);
+        }
+
+        .btn-save:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 12px 30px rgba(168, 85, 247, 0.45);
+        }
+
+        code {
+            background: rgba(255, 119, 154, 0.1);
+            padding: 3px 8px;
+            border-radius: 6px;
+            font-family: monospace;
+            color: #d63384;
+            font-weight: 700;
+        }
+
+        .help-text {
+            font-size: 0.8rem;
+            color: var(--text-color);
+            opacity: 0.8;
+            margin-top: 6px;
+        }
+
+        hr {
+            border-color: rgba(255, 183, 197, 0.3);
+            margin: 25px 0;
+        }
+
+        .toggle-content {
+            transition: all 0.35s ease-in-out;
+            max-height: 1000px;
+            overflow: hidden;
+            opacity: 1;
+        }
+
+        .toggle-content.is-hidden {
+            max-height: 0 !important;
+            opacity: 0 !important;
+            margin-bottom: 0 !important;
+            pointer-events: none;
+        }
+    </style>
+</head>
+
+<body>
+
+    <%- include('partials/navbar') %>
+
+    <div class="container container-custom">
+        <div class="mb-4 mt-3">
+            <a href="/manage/<%= guildId %>" style="text-decoration: none; color: var(--dark-pink); font-weight: 500; display: inline-flex; align-items: center; gap: 6px;">
+                <i class="fa-solid fa-arrow-left"></i> 返回群組管理首頁
+            </a>
+        </div>
+
+        <header style="text-align: center; margin-bottom: 35px;">
+            <h1 style="color: var(--dark-pink); margin-bottom: 8px; font-size: 2.5rem;">🎨 歡迎與離開系統設定</h1>
+            <p style="color: var(--text-color); font-weight: 500;">正在設定伺服器：<span style="color: var(--dark-color); font-weight: 700;"><%= guildName %></span></p>
+        </header>
+
+        <!-- 歡迎基礎設定 -->
+        <div class="config-section">
+            <h3><i class="fa-solid fa-bullhorn"></i> 歡迎系統 基礎發送設定</h3>
+            <div class="input-item">
+                <label>📢 歡迎訊息發送頻道</label>
+                <select id="welcomeChannelId">
+                    <option value="">-- 請選擇接收歡迎訊息的頻道 --</option>
+                    <% channels.forEach(function(channel) { %>
+                        <option value="<%= channel.id %>" <%= config.welcomeChannelId === channel.id ? 'selected' : '' %>># <%= channel.name %></option>
+                    <% }); %>
+                </select>
+            </div>
+            <div class="input-item">
+                <label>💬 外顯文字內容 (支援 <code>{user}</code>、<code>{guild}</code> 與 <code>{count}</code> 標籤)</label>
+                <textarea id="welcomeContent" rows="2" placeholder="🐾 歡迎 **{user}** 降落到了 **{guild}** 喵！您是本群第 {count} 位小萌新！"><%= config.welcomeContent || '' %></textarea>
+                <div class="help-text"><code>{user}</code> 用戶標籤, <code>{username}</code>用戶標籤ID,<code>{guild}</code> 群組名稱, <code>{count}</code> 成員總數</div>
+            </div>
+        </div>
+
+        <!-- 歡迎 Canvas 設定 -->
+        <div class="config-section">
+            <h3><i class="fa-solid fa-image"></i> 歡迎卡片 (Canvas 繪製) 設定</h3>
+            <label class="checkbox-group" for="sendCanvas">
+                <input type="checkbox" id="sendCanvas" <%= config.sendCanvas !== false ? 'checked' : '' %>>
+                <span>啟用 Canvas 圖片歡迎卡片</span>
+            </label>
+
+            <div id="canvasFields" class="toggle-content">
+                <div class="row">
+                    <div class="col-md-8 input-item">
+                        <label>✍️ 卡片大標題文字 (支援 <code>{guild}</code> 與 <code>{count}</code>)</label>
+                        <input type="text" id="canvasText" value="<%= config.canvasText || config.canvasMainText || '' %>" placeholder="">
+                    </div>
+                    <div class="col-md-4 input-item">
+                        <label>🎨 主標題文字顏色</label>
+                        <input type="color" id="canvasColor" value="<%= config.canvasColor %>">
+                    </div>
+                </div>
+
+                <!-- 副標題文字與色彩設定 -->
+                <div class="row">
+                    <div class="col-md-8 input-item">
+                        <label>✍️ 卡片副標題文字 (支援 <code>{username}</code>、<code>{guild}</code> 與 <code>{count}</code>，預設為 {user})</label>
+                        <input type="text" id="canvasSubText" value="<%= config.canvasSubText || '' %>" placeholder="">
+                    </div>
+                    <div class="col-md-4 input-item">
+                        <label>🎨 副標題文字顏色</label>
+                        <input type="color" id="canvasSubColor" value="<%= config.canvasSubColor || '#FFFFFF' %>">
+                    </div>
+                </div>
+
+                <div class="input-item">
+                    <label>🖼️ Canvas 自定義背景圖片網址 (URL)</label>
+                    <input type="text" id="canvasBg" value="<%= config.canvasBg || '' %>" placeholder="https://i.imgur.com/example.png (建議比例 800x250 px)">
+                </div>
+
+                <div class="input-item">
+                    <label>🕶️ 卡片背景半透明黑色遮罩 (目前透明度：<span id="opacityVal" style="color: var(--dark-pink);"><%= config.canvasOverlayOpacity !== undefined ? config.canvasOverlayOpacity : '0.4' %></span>)</label>
+                    <input type="range" class="form-range" id="canvasOverlayOpacity" min="0" max="1" step="0.05" 
+                           value="<%= config.canvasOverlayOpacity !== undefined ? config.canvasOverlayOpacity : '0.4' %>" 
+                           oninput="document.getElementById('opacityVal').innerText = this.value">
+                    <div class="help-text">向左拉至 0 可完全關閉半透明黑色遮罩，向右調高數值能讓背景變暗，使文字更加清晰。</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 歡迎 Embed 設定 -->
+        <div class="config-section">
+            <h3><i class="fa-solid fa-envelope-open-text"></i> 歡迎 Embed 豐富型嵌入訊息</h3>
+            <label class="checkbox-group" for="sendEmbed">
+                <input type="checkbox" id="sendEmbed" <%= config.sendEmbed !== false ? 'checked' : '' %>>
+                <span>啟用 歡迎 Embed 嵌入資訊框</span>
+            </label>
+
+            <div id="embedFields" class="toggle-content">
+                <div class="input-item">
+                    <label>Embed 訊息區塊標題 (支援 <code>{username}</code>、<code>{guild}</code> 與 <code>{count}</code>)</label>
+                    <input type="text" id="welcomeTitle" value="<%= config.welcomeTitle || '' %>" placeholder="例如：哇酷哇酷！{username} 歡迎來到 {guild}！">
+                </div>
+                <div class="input-item">
+                    <label>Embed 詳細描述內容 (支援 <code>{username}</code>、<code>{guild}</code> 與 <code>{count}</code>)</label>
+                    <textarea id="welcomeDescription" rows="3" placeholder="詳細的歡迎規章或介紹文字..."><%= config.welcomeDescription || '' %></textarea>
+                </div>
+                <div class="input-item">
+                    <label>📐 Embed 側邊條主題色彩</label>
+                    <input type="color" id="embedColor" value="<%= config.welcomeEmbedColor || config.embedColor %>">
+                </div>
+                <hr>
+                <label class="checkbox-group" for="showTimestamp">
+                    <input type="checkbox" id="showTimestamp" <%= config.showTimestamp ? 'checked' : '' %>>
+                    <span>在嵌入卡片中顯示時間戳記 (Timestamp)</span>
+                </label>
+                <label class="checkbox-group" for="showFooter">
+                    <input type="checkbox" id="showFooter" <%= config.showFooter ? 'checked' : '' %>>
+                    <span>啟用底部頁尾文字列 (Footer)</span>
+                </label>
+                <div class="input-item">
+                    <label>底部頁尾文字內容 (支援 <code>{user}</code>、<code>{guild}</code> 與 <code>{count}</code>)</label>
+                    <input type="text" id="welcomeFooter" value="<%= config.welcomeFooter || '' %>" placeholder="例如：{guild} 萌新報到處 🐾 | 第 {count} 位成員">
+                </div>
+            </div>
+        </div>
+
+        <!-- 離開系統 設定 -->
+        <div class="config-section leave-section">
+            <h3><i class="fa-solid fa-door-open"></i> 離開系統 通知發送設定</h3>
+            <label class="checkbox-group" for="sendLeave">
+                <input type="checkbox" id="sendLeave" <%= config.sendLeave ? 'checked' : '' %>>
+                <span>啟用成員離開通知系統</span>
+            </label>
+
+            <div id="leaveFields" class="toggle-content">
+                <div class="input-item">
+                    <label>📍 離開訊息發送頻道</label>
+                    <select id="leaveChannelId">
+                        <option value="">-- 請選擇接收離開訊息的頻道 --</option>
+                        <% channels.forEach(function(channel) { %>
+                            <option value="<%= channel.id %>" <%= config.leaveChannelId === channel.id ? 'selected' : '' %>># <%= channel.name %></option>
+                        <% }); %>
+                    </select>
+                </div>
+                <div class="input-item">
+                    <label>💬 外顯純文字內容 (支援 <code>{user}</code>、<code>{guild}</code> 與 <code>{count}</code>)</label>
+                    <textarea id="leaveContent" rows="2" placeholder="🐾 **{user}** 離開了 **{guild}** 喵..."><%= config.leaveContent || '' %></textarea>
+                </div>
+                <hr>
+                <label class="checkbox-group" for="sendLeaveEmbed">
+                    <input type="checkbox" id="sendLeaveEmbed" <%= config.sendLeaveEmbed ? 'checked' : '' %>>
+                    <span>啟用 離開 Embed 嵌入資訊框</span>
+                </label>
+
+                <div id="leaveEmbedFields" class="toggle-content">
+                    <div class="input-item">
+                        <label>Embed 離開訊息標題</label>
+                        <input type="text" id="leaveTitle" value="<%= config.leaveTitle || '' %>" placeholder="例如：{user} 搭乘小飛船離開了 {guild}...">
+                    </div>
+                    <div class="input-item">
+                        <label>Embed 離開詳細描述內容</label>
+                        <textarea id="leaveDescription" rows="3" placeholder="希望 {user} 未來旅途順利..."><%= config.leaveDescription || '' %></textarea>
+                    </div>
+                    <div class="input-item">
+                        <label>📐 離開 Embed 側邊條主題色彩</label>
+                        <input type="color" id="leaveEmbedColor" value="<%= config.leaveEmbedColor || '#A0AEC0' %>">
+                    </div>
+                    <label class="checkbox-group" for="showLeaveTimestamp">
+                        <input type="checkbox" id="showLeaveTimestamp" <%= config.showLeaveTimestamp ? 'checked' : '' %>>
+                        <span>在離開內嵌卡片中顯示時間戳記 (Timestamp)</span>
+                    </label>
+                    <label class="checkbox-group" for="showLeaveFooter">
+                        <input type="checkbox" id="showLeaveFooter" <%= config.showLeaveFooter ? 'checked' : '' %>>
+                        <span>啟用離開卡片底部頁尾 (Footer)</span>
+                    </label>
+                    <div class="input-item">
+                        <label>離開底部頁尾文字內容</label>
+                        <input type="text" id="leaveFooter" value="<%= config.leaveFooter || '' %>" placeholder="例如：{guild} 離別歡送會 🐾 | 歡送 {user}">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <button onclick="saveConfig()" class="btn-save">
+            <i class="fa-solid fa-paw"></i> 儲存所有系統設定 🐾
+        </button>
+        <p id="status" style="text-align: center; margin-top: 20px; font-weight: 700; min-height: 1.5em; font-size: 1.05rem;"></p>
+    </div>
+
+    <%- include('partials/footer') %>
+
+    <script>
+        function toggleSectionFields(checkboxId, targetFieldsId) {
+            const checkbox = document.getElementById(checkboxId);
+            const targetFields = document.getElementById(targetFieldsId);
+            if (checkbox && targetFields) {
+                targetFields.classList.toggle('is-hidden', !checkbox.checked);
+            }
+        }
+
+        document.addEventListener("DOMContentLoaded", function () {
+            toggleSectionFields('sendCanvas', 'canvasFields');
+            toggleSectionFields('sendEmbed', 'embedFields');
+            toggleSectionFields('sendLeave', 'leaveFields');
+            toggleSectionFields('sendLeaveEmbed', 'leaveEmbedFields');
+
+            document.getElementById('sendCanvas')?.addEventListener('change', () => toggleSectionFields('sendCanvas', 'canvasFields'));
+            document.getElementById('sendEmbed')?.addEventListener('change', () => toggleSectionFields('sendEmbed', 'embedFields'));
+            document.getElementById('sendLeave')?.addEventListener('change', () => toggleSectionFields('sendLeave', 'leaveFields'));
+            document.getElementById('sendLeaveEmbed')?.addEventListener('change', () => toggleSectionFields('sendLeaveEmbed', 'leaveEmbedFields'));
+        });
+
+        async function saveConfig() {
+            const status = document.getElementById('status');
+            const selectedEmbedColor = document.getElementById('embedColor').value;
+
+            const data = {
+                guildId: "<%= guildId %>",
+                welcomeChannelId: document.getElementById('welcomeChannelId').value,
+                welcomeContent: document.getElementById('welcomeContent').value,
+                leaveChannelId: document.getElementById('leaveChannelId').value,
+                leaveContent: document.getElementById('leaveContent').value,
+                sendLeave: document.getElementById('sendLeave').checked,
+                sendLeaveEmbed: document.getElementById('sendLeaveEmbed').checked,
+                leaveTitle: document.getElementById('leaveTitle').value,
+                leaveDescription: document.getElementById('leaveDescription').value,
+                leaveEmbedColor: document.getElementById('leaveEmbedColor').value,
+                showLeaveTimestamp: document.getElementById('showLeaveTimestamp').checked,
+                showLeaveFooter: document.getElementById('showLeaveFooter').checked,
+                leaveFooter: document.getElementById('leaveFooter').value,
+                sendCanvas: document.getElementById('sendCanvas').checked,
+                canvasText: document.getElementById('canvasText').value,
+                canvasMainText: document.getElementById('canvasText').value,
+                canvasColor: document.getElementById('canvasColor').value,
+                canvasSubText: document.getElementById('canvasSubText').value,
+                canvasSubColor: document.getElementById('canvasSubColor').value,
+                canvasBg: document.getElementById('canvasBg').value,
+                canvasOverlayOpacity: parseFloat(document.getElementById('canvasOverlayOpacity').value),
+                sendEmbed: document.getElementById('sendEmbed').checked,
+                welcomeTitle: document.getElementById('welcomeTitle').value,
+                welcomeDescription: document.getElementById('welcomeDescription').value,
+                welcomeEmbedColor: selectedEmbedColor,
+                showTimestamp: document.getElementById('showTimestamp').checked,
+                showFooter: document.getElementById('showFooter').checked,
+                welcomeFooter: document.getElementById('welcomeFooter').value
+            };
+
+            status.innerText = "⏳ 正在將設定同步至 MongoDB 資料庫中...";
+            status.style.color = "var(--text-color)";
+
+            try {
+                const res = await fetch('/api/save-config', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                const result = await res.json();
+
+                if (result.status === 'success') {
+                    status.innerText = "✨ 喵！所有設定已成功儲存至 MongoDB 並生效囉！";
+                    status.style.color = "#2ecc71";
+                    setTimeout(() => { status.innerText = ""; }, 4000);
+                } else {
+                    status.innerText = "❌ 儲存失敗了喵：" + result.message;
+                    status.style.color = "#e74c3c";
+                }
+            } catch (e) {
+                status.innerText = "❌ 糟糕，與後端失去連線，請確認程序是否還在運行喵！";
+                status.style.color = "#e74c3c";
+            }
+        }
+    </script>
+</body>
+
+</html>

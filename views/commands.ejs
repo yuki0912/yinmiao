@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/png" href="<%= botAvatar %>">
+    <title>🐾 <%= botName %> | 自動化指令手冊</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=ZCOOL+KuaiLe&family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- 引入 anime.js -->
+    <script src="https://cdn.jsdelivr.net/npm/animejs@3.2.1/lib/anime.min.js"></script>
+    
+    <style>
+        :root {
+            --primary-pink: #FFC8DD;
+            --dark-pink: #FF7B9C;
+            --cat-orange: #FF9E5E;
+            --slash-purple: #A855F7;
+            --dark-color: #2B2D42;
+            --text-color: #4A4E69;
+            --bg-gradient: linear-gradient(135deg, #FFE5EC 0%, #F0E6FF 100%);
+        }
+
+        body {
+            background: var(--bg-gradient);
+            font-family: 'Noto Sans TC', sans-serif;
+            color: var(--dark-color);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow-x: hidden;
+        }
+
+        h1, h2, h3, .navbar-brand { font-family: 'ZCOOL KuaiLe', 'Noto Sans TC', cursive; font-weight: 700; }
+
+        /* 頂級毛玻璃導航欄 */
+        .navbar {
+            background: rgba(255, 255, 255, 0.6) !important;
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.5);
+            box-shadow: 0 4px 20px rgba(255, 183, 197, 0.1);
+        }
+        
+        .navbar-brand {
+            background: linear-gradient(45deg, var(--dark-pink), var(--slash-purple));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        /* 夢幻浮空 Hero 區塊 */
+        .hero-section {
+            background: rgba(255, 255, 255, 0.45);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border-radius: 32px;
+            padding: 65px 20px;
+            margin-top: 20px;
+            margin-bottom: 45px;
+            box-shadow: 0 10px 32px rgba(255, 183, 197, 0.15);
+            border: 1px solid rgba(255, 255, 255, 0.6);
+        }
+        
+        .hero-section h1 {
+            font-size: 2.8rem;
+            background: linear-gradient(45deg, #FF7B9C, #7455F7);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        /* 指令大群組外殼 */
+        .command-container {
+            background: rgba(255, 255, 255, 0.35);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            border-radius: 28px;
+            border: 1px solid rgba(255, 255, 255, 0.4);
+            padding: 35px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.02);
+            margin-bottom: 50px;
+        }
+
+        /* 分類標籤進化版 */
+        .badge-prefix { 
+            background: linear-gradient(45deg, var(--cat-orange), #FF7E40); 
+            color: white; 
+            padding: 6px 16px; 
+            border-radius: 50px; 
+            font-size: 0.85rem; 
+            font-weight: 700;
+            box-shadow: 0 4px 12px rgba(255, 158, 94, 0.25);
+        }
+        .badge-slash { 
+            background: linear-gradient(45deg, var(--slash-purple), #7455F7); 
+            color: white; 
+            padding: 6px 16px; 
+            border-radius: 50px; 
+            font-size: 0.85rem; 
+            font-weight: 700;
+            box-shadow: 0 4px 12px rgba(168, 85, 247, 0.25);
+        }
+
+        /* 精緻動態指令單條項目 */
+        .cmd-item {
+            background: rgba(255, 255, 255, 0.65);
+            margin-bottom: 5px;
+            padding: 20px;
+            border-radius: 18px;
+            border: 1px solid rgba(255, 255, 255, 0.5);
+            border-left: 5px solid var(--dark-pink);
+            transition: all 0.35s cubic-bezier(0.25, 1, 0.5, 1);
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        
+        .cmd-item-slash { 
+            border-left-color: var(--slash-purple); 
+        }
+
+        /* 滑鼠懸浮至單個指令的華麗回饋 */
+        .cmd-item:hover {
+            background: white;
+            transform: translateY(-5px) scale(1.02);
+            box-shadow: 0 10px 25px rgba(255, 123, 156, 0.15);
+            border-color: rgba(255, 123, 156, 0.3);
+        }
+        
+        .cmd-item-slash:hover {
+            box-shadow: 0 10px 25px rgba(168, 85, 247, 0.15);
+            border-color: rgba(168, 85, 247, 0.3);
+        }
+
+        .cmd-name {
+            color: var(--dark-color);
+            font-weight: 900;
+            font-size: 1.15rem;
+            letter-spacing: 0.5px;
+        }
+        
+        .cmd-item-slash .cmd-name {
+            color: #6320EE;
+        }
+
+        .cmd-desc {
+            color: var(--text-color);
+            opacity: 0.85;
+            font-size: 0.92rem;
+            line-height: 1.5;
+        }
+
+        /* 俏皮 Q 彈按鈕 */
+        .btn-cute {
+            background: linear-gradient(45deg, #FF7B9C, #A855F7);
+            color: white;
+            border-radius: 50px;
+            padding: 10px 28px;
+            font-weight: 700;
+            font-size: 0.95rem;
+            border: none;
+            box-shadow: 0 6px 20px rgba(255, 123, 156, 0.3);
+            text-decoration: none;
+            transition: all 0.3s;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .btn-cute:hover { 
+            transform: translateY(-2px); 
+            box-shadow: 0 8px 25px rgba(168, 85, 247, 0.45);
+            color: white; 
+        }
+        .btn-cute:active { transform: translateY(0); }
+        
+        .btn-lg-cute {
+            padding: 14px 35px;
+            font-size: 1.05rem;
+        }
+    </style>
+</head>
+<body>
+
+<nav class="navbar navbar-expand-lg sticky-top mb-4">
+    <div class="container">
+        <a class="navbar-brand fs-3" href="/">🐾 <%= botName %></a>
+        <div class="ms-auto">
+            <% if (user) { %>
+                <a href="/dashboard" class="btn-cute"><i class="fa-solid fa-gauge-high me-1"></i> 控制台</a>
+            <% } else { %>
+                <a href="/login" class="btn-cute"><i class="fa-brand fa-discord me-1"></i> 登入 Discord</a>
+            <% } %>
+        </div>
+    </div>
+</nav>
+
+<div class="container" style="flex: 1;">
+    <div class="hero-section text-center">
+        <h1 class="display-5 fw-bold mb-3" id="heroTitle">銀喵指令手冊 🐾</h1>
+        <p class="fs-5 fw-medium" style="color: var(--text-color);">目前終端已就緒並載入 <b><%= prefixCmds.length + slashCmds.length %></b> 個自動化核心指令喵！</p>
+        <div class="mt-4">
+            <a href="<%= inviteLink %>" target="_blank" class="btn-cute btn-lg-cute px-4 mx-2" id="inviteBtn">
+                <i class="fa-solid fa-square-plus me-2"></i>邀請我入群
+            </a>
+        </div>
+    </div>
+
+    <h3 class="mb-4 d-flex align-items-center" style="color: var(--dark-color);" id="slashTitle">
+        <span class="me-2 text-primary">⚡</span> 斜線指令 <span class="badge-slash ms-3">Slash</span>
+    </h3>
+    <div class="command-container">
+        <div class="row g-3">
+            <% if (slashCmds && slashCmds.length > 0) { %>
+                <% slashCmds.forEach((cmd, index) => { %>
+                    <div class="col-md-6 col-lg-4 cmd-item-wrapper" style="--index: <%= index %>">
+                        <div class="cmd-item cmd-item-slash">
+                            <span class="cmd-name">/<%= cmd.name %></span>
+                            <span class="cmd-desc"><%= cmd.description %></span>
+                        </div>
+                    </div>
+                <% }) %>
+            <% } else { %>
+                <div class="col-12 text-center py-4">
+                    <p class="text-muted mb-0">目前核心中沒有註冊任何斜線指令喵...</p>
+                </div>
+            <% } %>
+        </div>
+    </div>
+
+    <h3 class="mb-4 d-flex align-items-center" style="color: var(--dark-color);" id="prefixTitle">
+        <span class="me-2" style="color: var(--cat-orange);">📌</span> 前綴指令 <span class="badge-prefix ms-3">Prefix (s!)</span>
+    </h3>
+    <div class="command-container">
+        <div class="row g-3">
+            <% if (prefixCmds && prefixCmds.length > 0) { %>
+                <% prefixCmds.forEach((cmd, index) => { %>
+                    <div class="col-md-6 col-lg-4 cmd-item-wrapper" style="--index: <%= index %>">
+                        <div class="cmd-item">
+                            <span class="cmd-name">s!<%= cmd.name %></span>
+                            <span class="cmd-desc"><%= cmd.description %></span>
+                        </div>
+                    </div>
+                <% }) %>
+            <% } else { %>
+                <div class="col-12 text-center py-4">
+                    <p class="text-muted mb-0">目前核心中沒有開放任何傳統前綴指令喵...</p>
+                </div>
+            <% } %>
+        </div>
+    </div>
+</div>
+
+<%- include('partials/footer') %>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    // anime.js 動畫設定
+    document.addEventListener('DOMContentLoaded', function() {
+        // Hero 標題動畫
+        anime({
+            targets: '#heroTitle',
+            opacity: [0, 1],
+            translateY: [-30, 0],
+            duration: 800,
+            easing: 'easeOutQuad'
+        });
+
+        // 按鈕入場動畫
+        anime({
+            targets: '#inviteBtn',
+            opacity: [0, 1],
+            scale: [0.8, 1],
+            duration: 600,
+            delay: 200,
+            easing: 'easeOutQuad'
+        });
+
+        // 指令項目級聯動畫
+        anime({
+            targets: '.cmd-item-wrapper',
+            opacity: [0, 1],
+            translateY: [20, 0],
+            duration: 500,
+            delay: anime.stagger(50),
+            easing: 'easeOutQuad'
+        });
+
+        // 指令卡片懸停時的 anime.js 動畫
+        document.querySelectorAll('.cmd-item').forEach(item => {
+            item.addEventListener('mouseenter', function() {
+                anime({
+                    targets: this,
+                    rotate: [0, 1],
+                    duration: 300,
+                    easing: 'easeOutQuad'
+                });
+            });
+        });
+    });
+</script>
+</body>
+</html>

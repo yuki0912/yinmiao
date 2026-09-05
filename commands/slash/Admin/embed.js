@@ -34,7 +34,7 @@ module.exports = {
         )
         .addStringOption(opt =>
             opt.setName('url')
-               .setDescription('點擊標題可跳轉的網址')
+               .setDescription('點擊標題可跳轉的網址（需包含 http:// 或 https://）')
                .setRequired(false)
         )
         .addAttachmentOption(opt =>
@@ -44,6 +44,9 @@ module.exports = {
         ),
 
     async execute(interaction) {
+        // 先延遲回應，防止發送過程超過 3 秒導致指令逾時
+        await interaction.deferReply({ flags: [MessageFlags.Ephemeral] });
+
         const title = interaction.options.getString('title');
         const description = interaction.options.getString('description').replace(/\\n/g, '\n');
         const targetChannel = interaction.options.getChannel('channel') || interaction.channel;
@@ -51,10 +54,10 @@ module.exports = {
         const url = interaction.options.getString('url');
         const image = interaction.options.getAttachment('image');
 
-        // 色碼格式檢查 (無填寫或格式錯誤時使用預設色)
+        // 色碼格式驗證
         const embedColor = (rawColor && /^#[0-9A-F]{6}$/i.test(rawColor)) ? rawColor : '#2F3136';
 
-        // 建立基本 Embed 卡片
+        // 建立 Embed 卡片
         const embed = new EmbedBuilder()
             .setAuthor({ 
                 name: interaction.guild.name, 
@@ -69,17 +72,31 @@ module.exports = {
                 iconURL: interaction.user.displayAvatarURL() 
             });
 
-        // 條件式加入可選參數
-        if (url) embed.setURL(url);
-        if (image) embed.setImage(image.url);
+        // URL 格式驗證（防範未帶 http/https 導致 Discord API 報錯）
+        if (url) {
+            try {
+                const parsedUrl = new URL(url);
+                if (['http:', 'https:'].includes(parsedUrl.protocol)) {
+                    embed.setURL(parsedUrl.href);
+                } else {
+                    return interaction.editReply('⚠️ 網址必須以 `http://` 或 `https://` 開頭喵！');
+                }
+            } catch (e) {
+                return interaction.editReply('⚠️ 提供的網址格式不正確，請檢查後重試喵！');
+            }
+        }
 
-        // 發送至指定頻道
-        await targetChannel.send({ embeds: [embed] });
+        if (image) {
+            embed.setImage(image.url);
+        }
 
-        // 私密回應提示
-        await interaction.reply({ 
-            content: `✅ 訊息已發送至 ${targetChannel} 囉喵！`, 
-            flags: [MessageFlags.Ephemeral] 
-        });
+        // 發送訊息與權限捕獲
+        try {
+            await targetChannel.send({ embeds: [embed] });
+            await interaction.editReply(`✅ 訊息已成功發送至 ${targetChannel} 囉喵！`);
+        } catch (err) {
+            console.error('發送 Embed 失敗:', err);
+            await interaction.editReply(`❌ 發送失敗，請確認銀喵在 ${targetChannel} 是否擁有「發送訊息」與「嵌入連結」權限喵！`);
+        }
     }
 };

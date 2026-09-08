@@ -1,5 +1,4 @@
 require('dotenv').config();
-process.env.TZ = process.env.TZ;
 
 const fs = require('node:fs');
 const path = require('node:path');

@@ -438,7 +438,6 @@ app.post('/api/save-config', async (req, res) => {
         const isVoiceForm = voiceSettings !== undefined;
 
         if (isWelcomeForm) {
-            // 🐾 包含所有 Canvas 與歡迎訊息設定的鍵值
             const welcomeKeys = [
                 'welcomeChannelId', 'welcomeContent', 'welcomeTitle', 'welcomeDescription',
                 'embedColor', 'welcomeEmbedColor', 'welcomeImageUrl', 
@@ -559,14 +558,33 @@ app.post('/api/send-embed', async (req, res) => {
         if (embedList.length === 0) return res.status(400).json({ status: 'error', message: '至少需要填寫一張卡片喵！' });
 
         const discordEmbeds = embedList.map(item => {
-            const embed = new EmbedBuilder()
-                .setTitle(item.title || '')
-                .setColor(item.color || '#3B82F6')
-                .setTimestamp();
+            const embed = new EmbedBuilder().setTimestamp();
 
-            if (item.description) embed.setDescription(item.description);
-            if (item.image) embed.setImage(item.image);
-            if (item.footer) embed.setFooter({ text: item.footer });
+            // 防呆處理：空字串傳入 EmbedBuilder 會拋出例外
+            if (item.title && item.title.trim()) embed.setTitle(item.title.trim());
+            if (item.description && item.description.trim()) embed.setDescription(item.description.replace(/\\n/g, '\n'));
+            if (item.url && /^https?:\/\//i.test(item.url)) embed.setURL(item.url.trim());
+
+            const embedColor = (item.color && /^#[0-9A-F]{6}$/i.test(item.color)) ? item.color : '#3B82F6';
+            embed.setColor(embedColor);
+
+            if (item.image && item.image.trim()) embed.setImage(item.image.trim());
+            if (item.thumbnail && item.thumbnail.trim()) embed.setThumbnail(item.thumbnail.trim());
+
+            if (item.author && item.author.trim()) {
+                embed.setAuthor({
+                    name: item.author.trim(),
+                    iconURL: item.authorIcon?.trim() || undefined,
+                    url: item.authorUrl?.trim() || undefined
+                });
+            }
+
+            if (item.footer && item.footer.trim()) {
+                embed.setFooter({
+                    text: item.footer.trim(),
+                    iconURL: item.footerIcon?.trim() || undefined
+                });
+            }
 
             return embed;
         });
@@ -576,6 +594,9 @@ app.post('/api/send-embed', async (req, res) => {
             const chunk = discordEmbeds.slice(i, i + chunkSize);
             await channel.send({ embeds: chunk });
         }
+
+        // 🐾 回應成功訊息給後台，解決請求卡死問題
+        res.json({ status: 'success', message: '✅ Embed 卡片已成功發送至指定頻道囉喵！🐾' });
 
     } catch (err) {
         console.error("網頁發送 Embed 卡片失敗:", err);

@@ -25,21 +25,6 @@ const {
     Events
 } = require('discord.js');
 
-// 🎵 --- 引入 DisTube 音樂模組 ---
-const { DisTube } = require('distube');
-const { YouTubePlugin } = require('@distube/youtube');
-
-// 🐾 --- 處理 YouTube Cookie (JSON 陣列解析) ---
-let youtubeCookies;
-if (process.env.YOUTUBE_COOKIE) {
-    try {
-        youtubeCookies = JSON.parse(process.env.YOUTUBE_COOKIE);
-        console.log('✅ 已成功解析環境變數 YOUTUBE_COOKIE (JSON 陣列) 喵！');
-    } catch (e) {
-        console.error('⚠️ 解析 YOUTUBE_COOKIE 失敗，請確認格式是否為有效的 JSON 陣列:', e.message);
-    }
-}
-
 // --- 1. 初始化 Express ---
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -53,21 +38,9 @@ const client = new Client({
         GatewayIntentBits.GuildMessages,
         GatewayIntentBits.MessageContent,
         GatewayIntentBits.GuildMessageReactions,
-        GatewayIntentBits.GuildVoiceStates // 🔊 DisTube 必備語音狀態 Intent
+        GatewayIntentBits.GuildVoiceStates // 🔊 動態語音頻道必備 Intent
     ],
     partials: [Partials.Message, Partials.Reaction, Partials.User, Partials.GuildMember]
-});
-
-// 🎵 --- 初始化 DisTube 並掛載至 client ---
-client.distube = new DisTube(client, {
-    emitNewSongOnly: true,
-    emitAddSongWhenCreatingQueue: false,
-    emitAddListWhenCreatingQueue: false,
-    plugins: [
-        new YouTubePlugin({
-            cookies: youtubeCookies
-        })
-    ]
 });
 
 client.slashCommands = new Collection();
@@ -438,12 +411,11 @@ app.post('/api/save-config', async (req, res) => {
         const isVoiceForm = voiceSettings !== undefined;
 
         if (isWelcomeForm) {
-            // 🐾 包含所有 Canvas 與歡迎訊息設定的鍵值
             const welcomeKeys = [
                 'welcomeChannelId', 'welcomeContent', 'welcomeTitle', 'welcomeDescription',
-                'embedColor', 'welcomeEmbedColor', 'welcomeImageUrl', 
-                'canvasText', 'canvasMainText', 'canvasSubText', 
-                'canvasColor', 'canvasSubColor', 'avatarBorderColor', 
+                'embedColor', 'welcomeEmbedColor', 'welcomeImageUrl',
+                'canvasText', 'canvasMainText', 'canvasSubText',
+                'canvasColor', 'canvasSubColor', 'avatarBorderColor',
                 'canvasBg', 'canvasBackgroundUrl', 'customBg', 'canvasOverlayOpacity',
                 'welcomeFooter', 'welcomeFooterIcon',
                 'leaveChannelId', 'leaveContent', 'leaveTitle', 'leaveDescription',
@@ -559,14 +531,32 @@ app.post('/api/send-embed', async (req, res) => {
         if (embedList.length === 0) return res.status(400).json({ status: 'error', message: '至少需要填寫一張卡片喵！' });
 
         const discordEmbeds = embedList.map(item => {
-            const embed = new EmbedBuilder()
-                .setTitle(item.title || '')
-                .setColor(item.color || '#3B82F6')
-                .setTimestamp();
+            const embed = new EmbedBuilder().setTimestamp();
 
-            if (item.description) embed.setDescription(item.description);
-            if (item.image) embed.setImage(item.image);
-            if (item.footer) embed.setFooter({ text: item.footer });
+            if (item.title && item.title.trim()) embed.setTitle(item.title.trim());
+            if (item.description && item.description.trim()) embed.setDescription(item.description.replace(/\\n/g, '\n'));
+            if (item.url && /^https?:\/\//i.test(item.url)) embed.setURL(item.url.trim());
+
+            const embedColor = (item.color && /^#[0-9A-F]{6}$/i.test(item.color)) ? item.color : '#3B82F6';
+            embed.setColor(embedColor);
+
+            if (item.image && item.image.trim()) embed.setImage(item.image.trim());
+            if (item.thumbnail && item.thumbnail.trim()) embed.setThumbnail(item.thumbnail.trim());
+
+            if (item.author && item.author.trim()) {
+                embed.setAuthor({
+                    name: item.author.trim(),
+                    iconURL: item.authorIcon?.trim() || undefined,
+                    url: item.authorUrl?.trim() || undefined
+                });
+            }
+
+            if (item.footer && item.footer.trim()) {
+                embed.setFooter({
+                    text: item.footer.trim(),
+                    iconURL: item.footerIcon?.trim() || undefined
+                });
+            }
 
             return embed;
         });
@@ -576,6 +566,8 @@ app.post('/api/send-embed', async (req, res) => {
             const chunk = discordEmbeds.slice(i, i + chunkSize);
             await channel.send({ embeds: chunk });
         }
+
+        res.json({ status: 'success', message: '✅ Embed 卡片已成功發送至指定頻道囉喵！🐾' });
 
     } catch (err) {
         console.error("網頁發送 Embed 卡片失敗:", err);
@@ -599,42 +591,6 @@ app.post('/api/delete-reaction-role', async (req, res) => {
 });
 
 app.get('/logout', (req, res) => { req.session.destroy(() => res.redirect('/')); });
-
-// 🎵 --- DisTube 事件監聽器 (音樂播報與狀態機制) ---
-client.distube
-    .on('playSong', (queue, song) => {
-        queue.textChannel?.send({
-            embeds: [
-                new EmbedBuilder()
-                    .setTitle('🎶 開始播放音樂喵！')
-                    .setDescription(`[${song.name}](${song.url})`)
-                    .addFields(
-                        { name: '⏱️ 時長', value: `\`${song.formattedDuration}\``, inline: true },
-                        { name: '👤 點歌者', value: `${song.user}`, inline: true }
-                    )
-                    .setThumbnail(song.thumbnail)
-                    .setColor('#FFC8DD')
-            ]
-        });
-    })
-    .on('addSong', (queue, song) => {
-        queue.textChannel?.send(`✅ 已將 **[${song.name}](${song.url})** 加入播放清單喵！`);
-    })
-    .on('addList', (queue, playlist) => {
-        queue.textChannel?.send(`✅ 已將播放清單 **${playlist.name}** (${playlist.songs.length} 首歌) 加入佇列喵！`);
-    })
-    .on('finish', (queue) => {
-        queue.textChannel?.send('🎵 佇列中的音樂全部播放完畢囉喵！');
-    })
-    .on('empty', (queue) => {
-        queue.textChannel?.send('🚪 語音頻道裡面沒有人了，銀喵先離開囉喵！🐾');
-    })
-    .on('error', (channel, error) => {
-        console.error('❌ DisTube 錯誤:', error);
-        if (channel && typeof channel.send === 'function') {
-            channel.send(`❌ 播放音樂時發生錯誤喵：${error.message.slice(0, 1900)}`).catch(() => { });
-        }
-    });
 
 // --- 8. 指令載入與服務啟動邏輯 ---
 function loadAllCommands(baseDir, collection) {

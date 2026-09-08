@@ -1,4 +1,5 @@
 require('dotenv').config();
+process.env.TZ = process.env.TZ;
 
 const fs = require('node:fs');
 const path = require('node:path');
@@ -24,21 +25,6 @@ const {
     Events
 } = require('discord.js');
 
-// 🎵 --- 引入 DisTube 音樂模組 ---
-const { DisTube } = require('distube');
-const { YouTubePlugin } = require('@distube/youtube');
-
-// 🐾 --- 處理 YouTube Cookie (JSON 陣列解析) ---
-let youtubeCookies;
-if (process.env.YOUTUBE_COOKIE) {
-    try {
-        youtubeCookies = JSON.parse(process.env.YOUTUBE_COOKIE);
-        console.log('✅ 已成功解析環境變數 YOUTUBE_COOKIE (JSON 陣列) 喵！');
-    } catch (e) {
-        console.error('⚠️ 解析 YOUTUBE_COOKIE 失敗，請確認格式是否為有效的 JSON 陣列:', e.message);
-    }
-}
-
 // --- 1. 初始化 Express ---
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -52,21 +38,9 @@ const client = new Client({
         GatewayIntentBits.GuildMessages,
         GatewayIntentBits.MessageContent,
         GatewayIntentBits.GuildMessageReactions,
-        GatewayIntentBits.GuildVoiceStates // 🔊 DisTube 必備語音狀態 Intent
+        GatewayIntentBits.GuildVoiceStates // 🔊 動態語音頻道必備 Intent
     ],
     partials: [Partials.Message, Partials.Reaction, Partials.User, Partials.GuildMember]
-});
-
-// 🎵 --- 初始化 DisTube 並掛載至 client ---
-client.distube = new DisTube(client, {
-    emitNewSongOnly: true,
-    emitAddSongWhenCreatingQueue: false,
-    emitAddListWhenCreatingQueue: false,
-    plugins: [
-        new YouTubePlugin({
-            cookies: youtubeCookies
-        })
-    ]
 });
 
 client.slashCommands = new Collection();
@@ -559,7 +533,6 @@ app.post('/api/send-embed', async (req, res) => {
         const discordEmbeds = embedList.map(item => {
             const embed = new EmbedBuilder().setTimestamp();
 
-            // 防呆處理：空字串傳入 EmbedBuilder 會拋出例外
             if (item.title && item.title.trim()) embed.setTitle(item.title.trim());
             if (item.description && item.description.trim()) embed.setDescription(item.description.replace(/\\n/g, '\n'));
             if (item.url && /^https?:\/\//i.test(item.url)) embed.setURL(item.url.trim());
@@ -594,7 +567,6 @@ app.post('/api/send-embed', async (req, res) => {
             await channel.send({ embeds: chunk });
         }
 
-        // 🐾 回應成功訊息給後台，解決請求卡死問題
         res.json({ status: 'success', message: '✅ Embed 卡片已成功發送至指定頻道囉喵！🐾' });
 
     } catch (err) {
@@ -619,42 +591,6 @@ app.post('/api/delete-reaction-role', async (req, res) => {
 });
 
 app.get('/logout', (req, res) => { req.session.destroy(() => res.redirect('/')); });
-
-// 🎵 --- DisTube 事件監聽器 (音樂播報與狀態機制) ---
-client.distube
-    .on('playSong', (queue, song) => {
-        queue.textChannel?.send({
-            embeds: [
-                new EmbedBuilder()
-                    .setTitle('🎶 開始播放音樂喵！')
-                    .setDescription(`[${song.name}](${song.url})`)
-                    .addFields(
-                        { name: '⏱️ 時長', value: `\`${song.formattedDuration}\``, inline: true },
-                        { name: '👤 點歌者', value: `${song.user}`, inline: true }
-                    )
-                    .setThumbnail(song.thumbnail)
-                    .setColor('#FFC8DD')
-            ]
-        });
-    })
-    .on('addSong', (queue, song) => {
-        queue.textChannel?.send(`✅ 已將 **[${song.name}](${song.url})** 加入播放清單喵！`);
-    })
-    .on('addList', (queue, playlist) => {
-        queue.textChannel?.send(`✅ 已將播放清單 **${playlist.name}** (${playlist.songs.length} 首歌) 加入佇列喵！`);
-    })
-    .on('finish', (queue) => {
-        queue.textChannel?.send('🎵 佇列中的音樂全部播放完畢囉喵！');
-    })
-    .on('empty', (queue) => {
-        queue.textChannel?.send('🚪 語音頻道裡面沒有人了，銀喵先離開囉喵！🐾');
-    })
-    .on('error', (channel, error) => {
-        console.error('❌ DisTube 錯誤:', error);
-        if (channel && typeof channel.send === 'function') {
-            channel.send(`❌ 播放音樂時發生錯誤喵：${error.message.slice(0, 1900)}`).catch(() => { });
-        }
-    });
 
 // --- 8. 指令載入與服務啟動邏輯 ---
 function loadAllCommands(baseDir, collection) {

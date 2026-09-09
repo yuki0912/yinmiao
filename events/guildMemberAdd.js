@@ -9,8 +9,9 @@ const fontPath = path.join(__dirname, '../NotoSansTC-Bold.ttf');
 let fontName = 'sans-serif';
 
 if (fs.existsSync(fontPath)) {
-    registerFont(fontPath, { family: "CustomFont" });
-    fontName = "CustomFont";
+    // 指定 family 為 "Noto Sans TC" 並明確標註 weight 為 "bold"
+    registerFont(fontPath, { family: "Noto Sans TC", weight: "bold" });
+    fontName = "Noto Sans TC";
 }
 
 // 動態調整字體大小以適應最大寬度
@@ -48,8 +49,8 @@ const drawCoverImage = (ctx, img, canvasWidth, canvasHeight) => {
 // 預設深色漸層背景
 const drawDefaultBg = (ctx, width = 800, height = 250) => {
     const gradient = ctx.createLinearGradient(0, 0, width, height);
-    gradient.addColorStop(0, '#101426');
-    gradient.addColorStop(1, '#080a14');
+    gradient.addColorStop(0, 'rgb(0, 0, 0)');
+    gradient.addColorStop(1, '#000000');
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, width, height);
 };
@@ -70,9 +71,9 @@ module.exports = {
             const replaceVars = (str, isMention = false, isCanvas = false) => {
                 if (!str) return "";
                 
-                const displayName = member.displayName || user.globalName || user.username; // 伺服器顯示名稱 / 暱稱
-                const rawUsername = user.username;                                            // 原始帳號名稱 (例如: xinolan.fualiekesi)
-                const userId = user.id;                                                       // Discord 純數字 ID
+                const displayName = member.displayName || user.globalName || user.username;
+                const rawUsername = user.username;
+                const userId = user.id;
 
                 const userReplacement = isCanvas 
                     ? displayName 
@@ -81,9 +82,9 @@ module.exports = {
                 return str
                     .replace(/{user}/g, userReplacement)
                     .replace(/{user_name}/g, displayName)
-                    .replace(/{username}/g, rawUsername)          // 新增：原始帳號名稱
-                    .replace(/{user_id}/g, userId)               // 新增：Discord 數字 ID
-                    .replace(/{display_name}/g, displayName)     // 新增：顯示暱稱
+                    .replace(/{username}/g, rawUsername)
+                    .replace(/{user_id}/g, userId)
+                    .replace(/{display_name}/g, displayName)
                     .replace(/{user_mention}/g, `<@${user.id}>`)
                     .replace(/{guild}/g, guild.name)
                     .replace(/{guild_name}/g, guild.name)
@@ -92,7 +93,7 @@ module.exports = {
             };
 
             // 外顯文字預設值
-            const rawWelcomeContent = config.welcomeContent || "🐾 歡迎 {user} 降落到了 {guild} 喵！您是本群第 {count} 位小萌新！";
+            const rawWelcomeContent = config.welcomeContent || "🐾 welcome {user} to the {guild}!";
             const textContent = replaceVars(rawWelcomeContent, true);
 
             // Canvas 卡片文字保底預設值處理
@@ -125,9 +126,9 @@ module.exports = {
                 let bgLoaded = false;
                 const customBgUrl = config.canvasBg || config.canvasBackgroundUrl || config.customBg;
 
-                if (customBgUrl) {
+                if (customBgUrl && typeof customBgUrl === 'string' && customBgUrl.trim() !== '') {
                     try {
-                        const bgImage = await loadImage(customBgUrl);
+                        const bgImage = await loadImage(customBgUrl.trim());
                         drawCoverImage(ctx, bgImage, canvasWidth, canvasHeight);
 
                         const opacity = (config.canvasOverlayOpacity !== undefined && !isNaN(config.canvasOverlayOpacity))
@@ -140,7 +141,7 @@ module.exports = {
                         }
                         bgLoaded = true;
                     } catch (e) {
-                        console.warn("⚠️ 背景圖片載入失敗，退回預設背景");
+                        console.warn(`⚠️ 背景圖片載入失敗 (${e.message})，退回預設背景`);
                     }
                 }
 

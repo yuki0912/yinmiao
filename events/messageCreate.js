@@ -87,7 +87,7 @@ module.exports = {
         const morningKeywords = ['早安'];
         if (morningKeywords.some(g => content.includes(g)) && content.length < 10) {
             message.channel.send('早安喵！✨').then(replyMsg => {
-                setTimeout(() => replyMsg.delete().catch(() => null), 30000);
+                setTimeout(() => replyMsg.delete().catch(() => null), 5000);
             }).catch(() => null);
             return;
         }
@@ -95,7 +95,7 @@ module.exports = {
         const afternoonKeywords = ['午安'];
         if (afternoonKeywords.some(g => content.includes(g)) && content.length < 10) {
             message.channel.send('午安喵！✨').then(replyMsg => {
-                setTimeout(() => replyMsg.delete().catch(() => null), 30000);
+                setTimeout(() => replyMsg.delete().catch(() => null), 5000);
             }).catch(() => null);
             return;
         }

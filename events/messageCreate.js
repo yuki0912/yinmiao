@@ -58,9 +58,6 @@ module.exports = {
                 const rawUrl = `https://x.com/${username}/status/${statusId}`;
                 const usnUrl = `https://x.com/${username}/`;
 
-                // ⚠️ 注意：
-                // 1. rawUrl 加 < > 可以徹底禁止產生 x.com 的重複預覽卡片
-                // 2. fxUrl 不能加 < >，否則 Discord 會把 FxTwitter 的媒體預覽也一起關掉
                 return `**[Tweet](<${rawUrl}>) ‖ [ACC](<${usnUrl}>) ‖ [X URL](${fxUrl}) **`;
             });
 
@@ -85,15 +82,22 @@ module.exports = {
         }
 
         // =========================================================================
-        // --- 🟢 自動回覆關鍵字系統 ---
+        // --- 🟢 自動回覆關鍵字系統（30 秒自動刪除） ---
+        // =========================================================================
         const morningKeywords = ['早安'];
         if (morningKeywords.some(g => content.includes(g)) && content.length < 10) {
-            return message.channel.send('早安喵！✨').catch(() => null);
+            message.channel.send('早安喵！✨').then(replyMsg => {
+                setTimeout(() => replyMsg.delete().catch(() => null), 30000);
+            }).catch(() => null);
+            return;
         }
 
         const afternoonKeywords = ['午安'];
         if (afternoonKeywords.some(g => content.includes(g)) && content.length < 10) {
-            return message.channel.send('午安喵！✨').catch(() => null);
+            message.channel.send('午安喵！✨').then(replyMsg => {
+                setTimeout(() => replyMsg.delete().catch(() => null), 30000);
+            }).catch(() => null);
+            return;
         }
 
         if (content === '機器人' || content === 'yinmiao bot') {

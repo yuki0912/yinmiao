@@ -1,5 +1,5 @@
 require('dotenv').config();
-process.env.TZ = process.env.TZ;
+process.env.TZ = process.env.TZ || 'Asia/Kuala_Lumpur';
 
 const fs = require('node:fs');
 const path = require('node:path');
@@ -25,10 +25,14 @@ const {
     Events
 } = require('discord.js');
 
-// --- 1. 初始化 Express ---
+// --- 1. 初始化 Express 與 MongoDB 連线 Promise ---
 const app = express();
 const PORT = process.env.PORT || 3000;
 const BOT_NAME = '銀喵 YinMiao';
+const isProduction = process.env.NODE_ENV === 'production';
+
+// 建立共用 Mongoose 連線 Promise，避免 MongoStore 重覆建立連線池
+const mongooseConnectionPromise = mongoose.connect(process.env.MONGODB_URI);
 
 // --- 2. 初始化 Discord Bot ---
 const client = new Client({
@@ -38,7 +42,7 @@ const client = new Client({
         GatewayIntentBits.GuildMessages,
         GatewayIntentBits.MessageContent,
         GatewayIntentBits.GuildMessageReactions,
-        GatewayIntentBits.GuildVoiceStates // 🔊 動態語音頻道必備 Intent
+        GatewayIntentBits.GuildVoiceStates // 🎙️ 保留動態語音頻道狀態偵測
     ],
     partials: [Partials.Message, Partials.Reaction, Partials.User, Partials.GuildMember]
 });
@@ -60,37 +64,48 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-app.set('trust proxy', 1);
+// 雲端反向代理（如 Nginx, Render, Heroku, Cloudflare）判斷 HTTPS 必備
+app.set('trust proxy', true);
 
 app.use(session({
     secret: process.env.SESSION_SECRET || 'yinmiao-secret-cat',
     resave: false,
     saveUninitialized: false,
     store: MongoStore.create({
-        mongoUrl: process.env.MONGODB_URI,
+        clientPromise: mongooseConnectionPromise.then(m => m.connection.getClient()),
         collectionName: 'sessions',
         ttl: 14 * 24 * 60 * 60
     }),
     cookie: {
         maxAge: 1000 * 60 * 60 * 24, // 1天
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax'
+        secure: isProduction,       // 正式環境使用 HTTPS，本地開發使用 HTTP
+        sameSite: isProduction ? 'none' : 'lax'
     }
 }));
 
+// 🐾 全域網域與協定判斷工具（自動適應 本地/雲端）
+function getBaseUrl(req) {
+    const protocol = req.headers['x-forwarded-proto'] || req.protocol;
+    return `${protocol}://${req.get('host')}`;
+}
+
+function getRedirectUri(req) {
+    if (process.env.REDIRECT_URI && process.env.REDIRECT_URI.trim() !== '') {
+        return process.env.REDIRECT_URI.trim();
+    }
+    return `${getBaseUrl(req)}/auth/callback`;
+}
+
 // --- 🐾 全域社群分享設定中間件 (OG Meta Data) ---
 app.use((req, res, next) => {
-    const protocol = req.protocol;
-    const host = req.get('host');
-    const fullUrl = `${protocol}://${host}${req.originalUrl}`;
-
+    const fullUrl = `${getBaseUrl(req)}${req.originalUrl}`;
     const currentAvatar = client.user ? client.user.displayAvatarURL({ size: 512, extension: 'png' }) : 'https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/512x512/1f431.png';
 
     res.locals.seo = {
         title: '銀喵 YinMiao | 妳的專屬 Discord 伺服器萌寵夥伴',
         description: '銀喵是一隻多功能 Discord 機器人，內建流暢的網頁後台控制台。',
         url: fullUrl,
-        image: `${protocol}://${host}/images/og-preview.png`,
+        image: `${getBaseUrl(req)}/images/og-preview.png`,
         botAvatar: currentAvatar
     };
 
@@ -101,8 +116,7 @@ app.use((req, res, next) => {
 // --- 4. OAuth2 工具與登入驗證中間件 ---
 const oauth = new OAuth2({
     clientId: process.env.CLIENT_ID,
-    clientSecret: process.env.CLIENT_SECRET,
-    redirectUri: process.env.REDIRECT_URI
+    clientSecret: process.env.CLIENT_SECRET
 });
 
 function checkAuth(req, res, next) {
@@ -110,14 +124,19 @@ function checkAuth(req, res, next) {
     next();
 }
 
-// 🐾 變數替換輔助函式
+// 🐾 變數替換輔助函式（防止未載入完整 Member 物件時崩潰）
 function parsePreviewText(text, member, guild) {
     if (!text) return '';
+    const userId = member?.id || member?.user?.id || '';
+    const username = member?.user?.username || member?.displayName || '使用者';
+    const guildName = guild?.name || '伺服器';
+    const memberCount = guild?.memberCount || 0;
+
     return text
-        .replace(/{user}/g, `<@${member.id}>`)
-        .replace(/{username}/g, member.user.username)
-        .replace(/{server}/g, guild.name)
-        .replace(/{count}/g, guild.memberCount);
+        .replace(/{user}/g, userId ? `<@${userId}>` : username)
+        .replace(/{username}/g, username)
+        .replace(/{server}/g, guildName)
+        .replace(/{count}/g, memberCount.toString());
 }
 
 // --- 5. 核心同步功能 ---
@@ -239,15 +258,27 @@ app.get('/', (req, res) => {
 });
 
 app.get('/login', (req, res) => {
-    const url = oauth.generateAuthUrl({ scope: ["identify", "guilds"], responseType: "code" });
+    const redirectUri = getRedirectUri(req);
+    const url = oauth.generateAuthUrl({
+        scope: ["identify", "guilds"],
+        responseType: "code",
+        redirectUri
+    });
     res.redirect(url);
 });
 
-app.get('/auth/callback/', async (req, res) => {
+// 相容有無結尾斜線的路徑
+app.get(['/auth/callback', '/auth/callback/'], async (req, res) => {
     const code = req.query.code;
     if (!code) return res.redirect('/');
     try {
-        const tokenData = await oauth.tokenRequest({ code, scope: "identify guilds", grantType: "authorization_code" });
+        const redirectUri = getRedirectUri(req);
+        const tokenData = await oauth.tokenRequest({
+            code,
+            scope: "identify guilds",
+            grantType: "authorization_code",
+            redirectUri
+        });
         const user = await oauth.getUser(tokenData.access_token);
         const guilds = await oauth.getUserGuilds(tokenData.access_token);
 
@@ -413,9 +444,9 @@ app.post('/api/save-config', async (req, res) => {
         if (isWelcomeForm) {
             const welcomeKeys = [
                 'welcomeChannelId', 'welcomeContent', 'welcomeTitle', 'welcomeDescription',
-                'embedColor', 'welcomeEmbedColor', 'welcomeImageUrl',
-                'canvasText', 'canvasMainText', 'canvasSubText',
-                'canvasColor', 'canvasSubColor', 'avatarBorderColor',
+                'embedColor', 'welcomeEmbedColor', 'welcomeImageUrl', 
+                'canvasText', 'canvasMainText', 'canvasSubText', 
+                'canvasColor', 'canvasSubColor', 'avatarBorderColor', 
                 'canvasBg', 'canvasBackgroundUrl', 'customBg', 'canvasOverlayOpacity',
                 'welcomeFooter', 'welcomeFooterIcon',
                 'leaveChannelId', 'leaveContent', 'leaveTitle', 'leaveDescription',
@@ -631,7 +662,7 @@ function loadHandlers() {
 async function startServer() {
     try {
         console.log('⏳ 正在連接資料庫...');
-        await mongoose.connect(process.env.MONGODB_URI);
+        await mongooseConnectionPromise;
         console.log('✅ 資料庫連接成功！');
 
         cron.schedule('0 0 * * 1', async () => {
@@ -644,7 +675,7 @@ async function startServer() {
             }
         }, {
             scheduled: true,
-            timezone: "Asia/Kuala_Lumpur"
+            timezone: process.env.TZ
         });
 
         loadHandlers();

@@ -241,9 +241,9 @@
                 </select>
             </div>
             <div class="input-item">
-                <label>💬 外顯文字內容 (支援 <code>{user}</code>、<code>{guild}</code> 與 <code>{count}</code> 標籤)</label>
-                <textarea id="welcomeContent" rows="2" placeholder="🐾 歡迎 **{user}** 降落到了 **{guild}** 喵！您是本群第 {count} 位小萌新！"><%= config.welcomeContent || '' %></textarea>
-                <div class="help-text"><code>{user}</code> 用戶標籤, <code>{username}</code>用戶標籤ID,<code>{guild}</code> 群組名稱, <code>{count}</code> 成員總數</div>
+                <label>💬 外顯文字內容 (支援 <code>{user}</code>、<code>{username}</code>、<code>{guild}</code> 與 <code>{count}</code> 標籤)</label>
+                <textarea id="welcomeContent" rows="2" placeholder="🐾 歡迎 {user} 降落到了 {guild} 喵！您是本群第 {count} 位小萌新！"><%= config.welcomeContent || '' %></textarea>
+                <div class="help-text"><code>{user}</code> 用戶提及標籤, <code>{username}</code> 用戶名稱, <code>{guild}</code> 伺服器名稱, <code>{count}</code> 成員總數</div>
             </div>
         </div>
 
@@ -259,19 +259,19 @@
                 <div class="row">
                     <div class="col-md-8 input-item">
                         <label>✍️ 卡片大標題文字 (支援 <code>{guild}</code> 與 <code>{count}</code>)</label>
-                        <input type="text" id="canvasText" value="<%= config.canvasText || config.canvasMainText || '' %>" placeholder="">
+                        <input type="text" id="canvasText" value="<%= config.canvasText || config.canvasMainText || '' %>" placeholder="WELCOME TO THE SERVER">
                     </div>
                     <div class="col-md-4 input-item">
                         <label>🎨 主標題文字顏色</label>
-                        <input type="color" id="canvasColor" value="<%= config.canvasColor %>">
+                        <input type="color" id="canvasColor" value="<%= config.canvasColor || '#FFFFFF' %>">
                     </div>
                 </div>
 
                 <!-- 副標題文字與色彩設定 -->
                 <div class="row">
                     <div class="col-md-8 input-item">
-                        <label>✍️ 卡片副標題文字 (支援 <code>{username}</code>、<code>{guild}</code> 與 <code>{count}</code>，預設為 {user})</label>
-                        <input type="text" id="canvasSubText" value="<%= config.canvasSubText || '' %>" placeholder="">
+                        <label>✍️ 卡片副標題文字 (支援 <code>{username}</code>、<code>{guild}</code> 與 <code>{count}</code>)</label>
+                        <input type="text" id="canvasSubText" value="<%= config.canvasSubText || '' %>" placeholder="{username} 歡迎加入社群！">
                     </div>
                     <div class="col-md-4 input-item">
                         <label>🎨 副標題文字顏色</label>
@@ -285,9 +285,9 @@
                 </div>
 
                 <div class="input-item">
-                    <label>🕶️ 卡片背景半透明黑色遮罩 (目前透明度：<span id="opacityVal" style="color: var(--dark-pink);"><%= config.canvasOverlayOpacity !== undefined ? config.canvasOverlayOpacity : '0.4' %></span>)</label>
+                    <label>🕶️ 卡片背景半透明黑色遮罩 (目前透明度：<span id="opacityVal" style="color: var(--dark-pink);"><%= (config.canvasOverlayOpacity !== undefined && config.canvasOverlayOpacity !== null) ? config.canvasOverlayOpacity : '0.4' %></span>)</label>
                     <input type="range" class="form-range" id="canvasOverlayOpacity" min="0" max="1" step="0.05" 
-                           value="<%= config.canvasOverlayOpacity !== undefined ? config.canvasOverlayOpacity : '0.4' %>" 
+                           value="<%= (config.canvasOverlayOpacity !== undefined && config.canvasOverlayOpacity !== null) ? config.canvasOverlayOpacity : '0.4' %>" 
                            oninput="document.getElementById('opacityVal').innerText = this.value">
                     <div class="help-text">向左拉至 0 可完全關閉半透明黑色遮罩，向右調高數值能讓背景變暗，使文字更加清晰。</div>
                 </div>
@@ -305,15 +305,15 @@
             <div id="embedFields" class="toggle-content">
                 <div class="input-item">
                     <label>Embed 訊息區塊標題 (支援 <code>{username}</code>、<code>{guild}</code> 與 <code>{count}</code>)</label>
-                    <input type="text" id="welcomeTitle" value="<%= config.welcomeTitle || '' %>" placeholder="例如：哇酷哇酷！{username} 歡迎來到 {guild}！">
+                    <input type="text" id="welcomeTitle" value="<%= config.welcomeTitle || '' %>" placeholder="哇酷哇酷！{username} 歡迎來到 {guild}！">
                 </div>
                 <div class="input-item">
                     <label>Embed 詳細描述內容 (支援 <code>{username}</code>、<code>{guild}</code> 與 <code>{count}</code>)</label>
-                    <textarea id="welcomeDescription" rows="3" placeholder="詳細的歡迎規章或介紹文字..."><%= config.welcomeDescription || '' %></textarea>
+                    <textarea id="welcomeDescription" rows="3" placeholder="請先至守則頻道閱讀社群規範，祝您交流愉快！"><%= config.welcomeDescription || '' %></textarea>
                 </div>
                 <div class="input-item">
                     <label>📐 Embed 側邊條主題色彩</label>
-                    <input type="color" id="embedColor" value="<%= config.welcomeEmbedColor || config.embedColor %>">
+                    <input type="color" id="embedColor" value="<%= config.welcomeEmbedColor || config.embedColor || '#FFC8DD' %>">
                 </div>
                 <hr>
                 <label class="checkbox-group" for="showTimestamp">
@@ -326,7 +326,7 @@
                 </label>
                 <div class="input-item">
                     <label>底部頁尾文字內容 (支援 <code>{user}</code>、<code>{guild}</code> 與 <code>{count}</code>)</label>
-                    <input type="text" id="welcomeFooter" value="<%= config.welcomeFooter || '' %>" placeholder="例如：{guild} 萌新報到處 🐾 | 第 {count} 位成員">
+                    <input type="text" id="welcomeFooter" value="<%= config.welcomeFooter || '' %>" placeholder="{guild} 萌新報到處 🐾 | 第 {count} 位成員">
                 </div>
             </div>
         </div>
@@ -350,8 +350,8 @@
                     </select>
                 </div>
                 <div class="input-item">
-                    <label>💬 外顯純文字內容 (支援 <code>{user}</code>、<code>{guild}</code> 與 <code>{count}</code>)</label>
-                    <textarea id="leaveContent" rows="2" placeholder="🐾 **{user}** 離開了 **{guild}** 喵..."><%= config.leaveContent || '' %></textarea>
+                    <label>💬 外顯純文字內容 (支援 <code>{user}</code>、<code>{username}</code>、<code>{guild}</code> 與 <code>{count}</code>)</label>
+                    <textarea id="leaveContent" rows="2" placeholder="🐾 {username} 離開了 {guild} 喵..."><%= config.leaveContent || '' %></textarea>
                 </div>
                 <hr>
                 <label class="checkbox-group" for="sendLeaveEmbed">
@@ -362,11 +362,11 @@
                 <div id="leaveEmbedFields" class="toggle-content">
                     <div class="input-item">
                         <label>Embed 離開訊息標題</label>
-                        <input type="text" id="leaveTitle" value="<%= config.leaveTitle || '' %>" placeholder="例如：{user} 搭乘小飛船離開了 {guild}...">
+                        <input type="text" id="leaveTitle" value="<%= config.leaveTitle || '' %>" placeholder="{username} 搭乘小飛船離開了 {guild}...">
                     </div>
                     <div class="input-item">
                         <label>Embed 離開詳細描述內容</label>
-                        <textarea id="leaveDescription" rows="3" placeholder="希望 {user} 未來旅途順利..."><%= config.leaveDescription || '' %></textarea>
+                        <textarea id="leaveDescription" rows="3" placeholder="希望 {username} 未來旅途順利..."><%= config.leaveDescription || '' %></textarea>
                     </div>
                     <div class="input-item">
                         <label>📐 離開 Embed 側邊條主題色彩</label>
@@ -382,7 +382,7 @@
                     </label>
                     <div class="input-item">
                         <label>離開底部頁尾文字內容</label>
-                        <input type="text" id="leaveFooter" value="<%= config.leaveFooter || '' %>" placeholder="例如：{guild} 離別歡送會 🐾 | 歡送 {user}">
+                        <input type="text" id="leaveFooter" value="<%= config.leaveFooter || '' %>" placeholder="{guild} 離別歡送會 🐾 | 歡送 {username}">
                     </div>
                 </div>
             </div>

@@ -16,17 +16,7 @@ module.exports = {
             const phixivUrl = `https://phixiv.net/artworks/${match[1]}`;
             convertedLinks.push(`**[Pixiv](<${rawUrl}>) ‖ [Phixiv](${phixivUrl})**`);
         }
-
-        // 📷 Instagram (ddinstagram.com)
-        const instagramRegex = /https?:\/\/(?:www\.)?(?:instagram|oginstagram)\.com\/(p|reel|reels)\/([a-zA-Z0-9_-]+)/g;
-        for (const match of content.matchAll(instagramRegex)) {
-            const type = match[1];
-            const postId = match[2];
-            const rawUrl = `https://instagram.com/${type}/${postId}`;
-            const ddUrl = `https://ddinstagram.com/${type}/${postId}`;
-            convertedLinks.push(`**[Instagram](<${rawUrl}>) ‖ [IG URL](${ddUrl})**`);
-        }
-
+        
         // 發送轉換後的超連結並關閉原始預覽
         if (convertedLinks.length > 0) {
             try {

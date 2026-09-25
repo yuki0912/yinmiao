@@ -20,10 +20,11 @@
 * **🌐 炫彩網頁後台控制台**：整合全自動 Discord OAuth2 登入，管理員免動程式碼，用瀏覽器就能輕鬆勾選並設定功能！
 * **🛡️ 高效能 AutoMod 惡意攔截**：專治盜帳號詐騙與惡意炸群。當使用者傳送**任何檔案/照片/影片**並同時**標記全體（`@everyone` / `@here`）**時，銀喵將於一秒內粉碎訊息、發送警告並**強制禁言該用戶 24 小時**。不含標記的日常分享則完全不受影響！
 * **📜 動態守則認證系統**：自動生成精美內嵌 (Embed) 守則訊息，新成員只需點擊 ✅ 反應，即可秒速賦予身分組。
-* **👋 精美歡迎系統 (Canvas/Web)**：支援動態頻道自訂與歡迎文字客製化，整合 Canvas 繪製帶有成員頭像與名稱的图卡，並支援直連網頁設定連結。
+* **👋 精美歡迎系統 (Canvas/Web)**：支援動態頻道自訂與歡迎文字客製化，整合 Canvas 繪製帶有成員頭像與名稱的圖卡，並支援直連網頁設定連結。
 * **📊 活躍度等級系統**：內建流暢的聊天經驗值 (XP) 賺取機制，包含動態進度條個人檔案卡片與全伺服器活躍排行榜。升級祝賀訊息於 5 秒後自動回收，確保頻道整潔。
 * **💰 萌寵經濟系統**：每日簽到、隨機打工任務、玩家自由轉帳，讓伺服器互動更好玩。
 * **🚀 開發者全域廣播**：內建開發者特權廣播指令（帶有即時邊框圖卡預覽與安全確認按鈕），一鍵同步公告至所有伺服器。
+* **📢 社群動態通知**：可整合 YouTube RSS 與 X API，將指定帳號的新貼文、指定頻道的新影片等內容推送至 Discord。（通知模組需另外安裝對應套件並完成 API 設定。）
 
 ---
 
@@ -35,6 +36,7 @@
 * **斜線指令 (Slash)**：直接在對話框輸入 `/` 即可喚出選單。
 
 ### ⚙️ 管理員與核心設定 (Admin & Config)
+
 | 斜線指令             | 功能描述                                                          | 權限要求                   |
 | :------------------- | :---------------------------------------------------------------- | :------------------------- |
 | `/set-welcome`       | 🛠️ 設定歡迎頻道、開啟 Embed/Canvas 卡片開關及綁定後台網址          | 管理員 (Administrator)     |
@@ -48,7 +50,27 @@
 | `/reload`            | ♻️ 執行中強制刷新特定或全部（`all`）斜線指令的底層邏輯             | 管理員 (Administrator)     |
 | `/broadcast`         | 🚀 **[核心開發者專用]** 全網伺服器官方公告同步發送（一般人不可見） | 開發者限定 (0)             |
 
+### 📢 社群動態通知 (YouTube / X)
+
+銀喵可以加入社群動態監控模組：
+
+| 平台 | 通知內容 | 建議方式 |
+| :--- | :--- | :--- |
+| YouTube | 新影片、頻道更新 | YouTube RSS + `rss-parser` |
+| X / Twitter | 指定帳號的新貼文 | X API + `twitter-api-v2` |
+
+安裝通知模組所需套件：
+
+```bash
+npm install rss-parser twitter-api-v2
+```
+
+> **注意：** YouTube RSS 通常不需要 YouTube Data API Key。X / Twitter 則需要依目前 X API 的存取方案與權限取得對應憑證。請勿把 API Token、Bearer Token 或其他機密資訊直接寫入程式碼或提交至 Git。
+
+---
+
 ### 📊 等級與個人檔案 (Leveling & Economy)
+
 | 前綴指令 | 斜線指令       | 指令描述                                                     |
 | :------- | :------------- | :----------------------------------------------------------- |
 | `s!rank` | `/profile`     | 彈出精美的個人檔案卡片（包含等級、經驗值進度條、銀喵幣資產） |
@@ -60,19 +82,24 @@
 
 銀喵的架構非常穩健，主要基於以下技術構建：
 
-* **核心框架**：`discord.js v14.26.0`
+* **核心框架**：`discord.js v14`
 * **後端伺服器**：`express` 與 `cors`
 * **資料庫管理**：`mongoose` (MongoDB)
 * **圖像渲染**：`canvas` (動態繪製歡迎卡片)
 * **網頁 Session**：`connect-mongo` & `express-session`
+* **排程任務**：`node-cron`
 * **外部工具**：`discord-oauth2`、`axios`
+* **YouTube 通知（可選）**：`rss-parser`
+* **X / Twitter 通知（可選）**：`twitter-api-v2`
 
 ---
 
 ## 🚀 部署與啟動指南 (Deployment)
 
 ### 1. 環境變數設定
+
 請在專案根目錄建立 `.env` 檔案，並填入以下機密資訊（**切勿流出**）：
+
 ```
 DISCORD_TOKEN=你的機器人Token
 CLIENT_ID=你的應用程式ID
@@ -80,20 +107,32 @@ GUILD_ID=你的測試伺服器ID
 MONGODB_URI=你的MongoDB連接字串
 PORT=3000
 TZ=Asia/Kuala_Lumpur
+
+# X / Twitter 通知（啟用時填寫）
+X_BEARER_TOKEN=你的X_Bearer_Token
 ```
 
-安裝依賴
-```
+### 2. 安裝依賴
+
+```bash
 npm install
 ```
 
-本地啟動
+若只需要另外啟用 YouTube / X 通知模組，也可以手動安裝：
+
+```bash
+npm install rss-parser twitter-api-v2
 ```
+
+### 3. 本地啟動
+
+```bash
 npm start
 ```
 
-使用 PM2 進行 24 💡 小時守護執行
-```
+### 4. 使用 PM2 進行 24 💡 小時守護執行
+
+```bash
 # 全域安裝 PM2
 npm install pm2 -g
 
@@ -105,3 +144,23 @@ npm install pm2-windows-startup -g
 pm2-startup install
 pm2 save
 ```
+
+---
+
+## 🔐 安全提醒
+
+請勿將以下內容直接提交到 GitHub：
+
+* Discord Bot Token
+* X / Twitter Bearer Token
+* API Keys
+* MongoDB 連接字串及密碼
+* Discord OAuth2 Secret
+
+建議使用 `.env` 並將其加入 `.gitignore`。
+
+---
+
+## 📄 License
+
+本專案目前使用 ISC License。

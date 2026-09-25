@@ -13,71 +13,145 @@
 
 ---
 
-## 🌟 核心特色功能
+## 🌟 目前功能
 
-銀喵是一隻結合了**豐富互動社群功能**與**流暢網頁後台控制台**的多功能 Discord 機器人，無論是伺服器管理還是社群活躍，銀喵都能一手包辦：
+銀喵是一隻以 **Discord.js v14 + MongoDB + Express** 為核心的多功能 Discord Bot，提供伺服器管理、社群互動、經濟系統、娛樂工具與 TRPG 功能。
 
-* **🌐 炫彩網頁後台控制台**：整合全自動 Discord OAuth2 登入，管理員免動程式碼，用瀏覽器就能輕鬆勾選並設定功能！
-* **🛡️ 高效能 AutoMod 惡意攔截**：專治盜帳號詐騙與惡意炸群。當使用者傳送**任何檔案/照片/影片**並同時**標記全體（`@everyone` / `@here`）**時，銀喵將於一秒內粉碎訊息、發送警告並**強制禁言該用戶 24 小時**。不含標記的日常分享則完全不受影響！
-* **📜 動態守則認證系統**：自動生成精美內嵌 (Embed) 守則訊息，新成員只需點擊 ✅ 反應，即可秒速賦予身分組。
-* **👋 精美歡迎系統 (Canvas/Web)**：支援動態頻道自訂與歡迎文字客製化，整合 Canvas 繪製帶有成員頭像與名稱的圖卡，並支援直連網頁設定連結。
-* **📊 活躍度等級系統**：內建流暢的聊天經驗值 (XP) 賺取機制，包含動態進度條個人檔案卡片與全伺服器活躍排行榜。升級祝賀訊息於 5 秒後自動回收，確保頻道整潔。
-* **💰 萌寵經濟系統**：每日簽到、隨機打工任務、玩家自由轉帳，讓伺服器互動更好玩。
-* **🚀 開發者全域廣播**：內建開發者特權廣播指令（帶有即時邊框圖卡預覽與安全確認按鈕），一鍵同步公告至所有伺服器。
-* **📢 社群動態通知**：可整合 YouTube RSS 與 X API，將指定帳號的新貼文、指定頻道的新影片等內容推送至 Discord。（通知模組需另外安裝對應套件並完成 API 設定。）
+### 🛡️ 伺服器管理與自動化
+- **🌐 網頁控制台**：Discord OAuth2 登入，從瀏覽器管理伺服器設定。
+- **🤖 AutoMod 防護**：偵測可疑的檔案/圖片/影片搭配大範圍標記的訊息並自動處理。
+- **📜 規則驗證系統**：建立或綁定規則訊息，透過反應完成身分組驗證。
+- **🎭 反應身份組**：支援跨頻道綁定訊息、Emoji 與身份組。
+- **👋 歡迎系統**：支援 Embed、Canvas、文字內容、圖片與頻道設定。
+- **🚪 離開通知**：成員離開時可發送自訂通知。
+- **🎫 工單系統**：建立工單面板，讓成員建立私密支援頻道。
+- **🔊 動態語音房**：設定語音母頻道後自動建立臨時語音房。
+- **📢 公告系統**：支援 Modal、圖片、指定身份組標記與 Embed。
+- **🧹 訊息管理**：批量清理訊息，可指定成員。
+- **🔨 成員管理**：踢出、封鎖及管理成員資料。
+- **🎂 生日系統**：管理伺服器成員生日設定。
+- **♻️ 指令熱重載**：執行期間重新載入 Slash Command。
+- **🚀 開發者全域廣播**：預覽並同步官方公告至所有伺服器。
 
----
+### 📈 等級與社群
+- **✨ XP / 等級系統**：聊天獲得 XP、升級並查看排行。
+- **🏆 排行榜**：查看伺服器等級與經驗排名。
+- **🪪 個人資訊卡**：顯示成員等級、XP 與銀喵幣等資訊。
+- **🔗 連結修復**：改善 Twitter / X、Pixiv 等連結在 Discord 的預覽效果。
 
-## 🛠️ 指令手冊 (Commands)
+### 💰 銀喵經濟系統
+- **📅 每日簽到**：領取銀喵幣並支援連續簽到獎勵。
+- **🛠️ 打工系統**：透過工作獲得銀喵幣。
+- **💸 玩家轉帳**：成員之間轉移銀喵幣。
+- **🛒 商店系統**：使用銀喵幣購買商品。
+- **🪙 硬幣遊戲**：進行正反面遊戲。
 
-本機器人完美支援 **斜線指令 (Slash Commands)** 與 **傳統前綴指令 (Prefix Commands)** 雙系統！
+### 🎮 娛樂與內容工具
+隨機動漫圖片、Neko 貓耳少女、Waifu、Reddit Meme、Pat 互動、Echo、翻譯、Pinterest、Pixiv、Ping 與 Help 等功能。
 
-* **預設前綴 (Prefix)**：`s!` (例如：`s!rank`)
-* **斜線指令 (Slash)**：直接在對話框輸入 `/` 即可喚出選單。
-
-### ⚙️ 管理員與核心設定 (Admin & Config)
-
-| 斜線指令             | 功能描述                                                          | 權限要求                   |
-| :------------------- | :---------------------------------------------------------------- | :------------------------- |
-| `/set-welcome`       | 🛠️ 設定歡迎頻道、開啟 Embed/Canvas 卡片開關及綁定後台網址          | 管理員 (Administrator)     |
-| `/rule`              | 📜 設定規則驗證系統（支援彈窗建立新訊息或綁定現有舊訊息 ID）       | 管理員 (Administrator)     |
-| `/add-reaction-role` | 🔗 跨頻道綁定反應身份組，成員點擊指定表情即刻獲得身分              | 管理員 (Administrator)     |
-| `/announce公告`      | 📢 透過 Modal 彈窗撰寫公告，支援標記特定身分組並觸發亮紅點         | 管理員 (Administrator)     |
-| `/clear`             | 🧹 批次清理頻道訊息（最高一次 100 則），5 秒後自動隱形             | 管理訊息 (Manage Messages) |
-| `/kick`              | 👢 將指定成員踢出伺服器（內建職位階級安全檢查機制）                | 踢出成員 (Kick Members)    |
-| `/ban`               | 🚫 永久封鎖成員，阻止其再次加入伺服器                              | 封鎖成員 (Ban Members)     |
-| `/manage-user`       | 🛠️ 管理專用子指令：`add-coins` 調整金幣 / `set-level` 修改等級     | 管理員 (Administrator)     |
-| `/reload`            | ♻️ 執行中強制刷新特定或全部（`all`）斜線指令的底層邏輯             | 管理員 (Administrator)     |
-| `/broadcast`         | 🚀 **[核心開發者專用]** 全網伺服器官方公告同步發送（一般人不可見） | 開發者限定 (0)             |
-
-### 📢 社群動態通知 (YouTube / X)
-
-銀喵可以加入社群動態監控模組：
-
-| 平台 | 通知內容 | 建議方式 |
-| :--- | :--- | :--- |
-| YouTube | 新影片、頻道更新 | YouTube RSS + `rss-parser` |
-| X / Twitter | 指定帳號的新貼文 | X API + `twitter-api-v2` |
-
-安裝通知模組所需套件：
-
-```bash
-npm install rss-parser twitter-api-v2
-```
-
-> **注意：** YouTube RSS 通常不需要 YouTube Data API Key。X / Twitter 則需要依目前 X API 的存取方案與權限取得對應憑證。請勿把 API Token、Bearer Token 或其他機密資訊直接寫入程式碼或提交至 Git。
+### 🎲 TRPG 系統
+內建角色卡、骰子、D20 屬性檢定、技能檢定、屬性升級、隨機冒險與故事生成。
 
 ---
 
-### 📊 等級與個人檔案 (Leveling & Economy)
+## 🛠️ Slash Commands
 
-| 前綴指令 | 斜線指令       | 指令描述                                                     |
-| :------- | :------------- | :----------------------------------------------------------- |
-| `s!rank` | `/profile`     | 彈出精美的個人檔案卡片（包含等級、經驗值進度條、銀喵幣資產） |
-| *(暫無)* | `/leaderboard` | 查看全伺服器活躍度最高、等級前 10 名的玩家排行榜             |
+目前 Slash Commands 共 **45 個**，分為 **Admin、Economy、Fun、General、TRPG** 五大分類。直接在 Discord 輸入 `/` 即可使用；部分管理指令會依 Discord 權限限制。
+
+### ⚙️ Admin｜管理與設定
+| 指令 | 功能 |
+| :--- | :--- |
+| `/add-reaction-role` | 🔗 綁定反應身份組，支援跨頻道 |
+| `/announce公告` | 📢 透過 Modal 發布正式公告 |
+| `/ban` | 🚫 永久封鎖指定成員 |
+| `/broadcast` | 🚀 開發者專用全域公告與預覽 |
+| `/clear` | 🧹 清理頻道訊息，可指定成員 |
+| `/embed` | 🖼️ 發送標準 Embed 卡片 |
+| `/kick` | 👢 將成員踢出伺服器 |
+| `/manage-user` | 🛠️ 管理成員等級、經驗與銀喵幣 |
+| `/reload` | ♻️ 重新載入 Slash Command |
+| `/rule` | 📜 設定規則驗證系統 |
+| `/birthday` | 🎂 管理生日系統 |
+| `/set-leave` | 🚪 設定離開通知 |
+| `/set-ticket` | 🎫 發送與設定工單面板 |
+| `/set-welcome` | 👋 設定歡迎系統 |
+| `/setup-voice` | 🔊 設定動態語音房 |
+| `/test-leave` | 🧪 測試離開通知效果 |
+| `/testwelcome` | 🧪 測試歡迎訊息效果 |
+| `/view-config` | 📊 查看歡迎系統詳細設定 |
+
+### 💰 Economy｜經濟
+| 指令 | 功能 |
+| :--- | :--- |
+| `/daily` | 📅 每日簽到領取銀喵幣 |
+| `/pay` | 💸 轉帳銀喵幣 |
+| `/shop` | 🛒 使用銀喵幣購買商品 |
+| `/works` | 🛠️ 打工賺取銀喵幣 |
+
+### 🎮 Fun｜娛樂
+| 指令 | 功能 |
+| :--- | :--- |
+| `/anime` | 🎨 隨機動漫圖片 |
+| `/echo` | 🔊 重複指定內容 |
+| `/help` | 📋 顯示指令清單 |
+| `/meme` | 😂 Reddit 迷因圖片 |
+| `/neko` | 🐱 隨機貓耳少女圖片 |
+| `/pat` | 👋 與指定成員互動 |
+| `/ping` | 🏓 查看 Bot 回應狀態 |
+| `/rank` | 🏆 查看等級與經驗排行 |
+| `/translate` | 🌐 翻譯指定文字 |
+| `/waifu` | ✨ 隨機老婆圖片 |
+
+### 🔎 General｜一般工具
+| 指令 | 功能 |
+| :--- | :--- |
+| `/coinflip` | 🪙 擲硬幣遊戲 |
+| `/twitter` | 🔗 修復 Twitter / X 與 Pixiv 連結預覽 |
+| `/leaderboard` | 🏆 查看伺服器等級排行榜 |
+| `/pinterest` | 📌 搜尋 Pinterest 日本站內容 |
+| `/pixiv` | 🎨 搜尋 Pixiv 插畫與二創 |
+
+### 🎲 TRPG｜角色扮演
+| 指令 | 功能 |
+| :--- | :--- |
+| `/adventure` | 🧭 消耗銀喵幣開啟隨機冒險 |
+| `/character` | 🎭 TRPG 角色卡系統 |
+| `/check` | 🎲 D20 屬性檢定 |
+| `/dice` | 🎲 TRPG 骰子系統 |
+| `/skill` | 🎯 TRPG 技能檢定 |
+| `/stats-buy` | 💊 消耗銀喵幣提升屬性 |
+| `/story` | 📖 生成 TRPG 故事開場 |
 
 ---
 
+## 🧩 Discord Events 與自動化
+
+- `guildMemberAdd`：新成員加入與歡迎系統
+- `guildMemberRemove`：成員離開通知
+- `interactionCreate`：Slash Command、Button、Modal 等互動
+- `messageCreate`：訊息監控、AutoMod 與自動化
+- `messageDelete`：訊息刪除事件
+- `messageReactionAdd` / `messageReactionRemove`：反應身份組
+- `voiceStateUpdate`：動態語音房建立與清理
+- `ticketHandler`：工單建立與管理
+- `linkFixer`：社群連結預覽修復
+- `xp`：聊天 XP 與等級系統
+- `ready`：Bot 啟動、排程與初始化
+
+---
+
+## 🌐 網頁控制台
+
+- Discord OAuth2 登入
+- 伺服器設定管理
+- 歡迎系統設定
+- 規則管理
+- 反應身份組設定
+- 工單設定
+- 動態語音設定
+- Embed / 視覺化內容設定
+
+---
 ## 📦 專案技術棧與依賴 (Tech Stack)
 
 銀喵的架構非常穩健，主要基於以下技術構建：
@@ -89,8 +163,6 @@ npm install rss-parser twitter-api-v2
 * **網頁 Session**：`connect-mongo` & `express-session`
 * **排程任務**：`node-cron`
 * **外部工具**：`discord-oauth2`、`axios`
-* **YouTube 通知（可選）**：`rss-parser`
-* **X / Twitter 通知（可選）**：`twitter-api-v2`
 
 ---
 
@@ -107,21 +179,12 @@ GUILD_ID=你的測試伺服器ID
 MONGODB_URI=你的MongoDB連接字串
 PORT=3000
 TZ=Asia/Kuala_Lumpur
-
-# X / Twitter 通知（啟用時填寫）
-X_BEARER_TOKEN=你的X_Bearer_Token
 ```
 
 ### 2. 安裝依賴
 
 ```bash
 npm install
-```
-
-若只需要另外啟用 YouTube / X 通知模組，也可以手動安裝：
-
-```bash
-npm install rss-parser twitter-api-v2
 ```
 
 ### 3. 本地啟動
@@ -152,7 +215,6 @@ pm2 save
 請勿將以下內容直接提交到 GitHub：
 
 * Discord Bot Token
-* X / Twitter Bearer Token
 * API Keys
 * MongoDB 連接字串及密碼
 * Discord OAuth2 Secret

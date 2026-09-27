@@ -124,6 +124,9 @@ function checkAuth(req, res, next) {
     next();
 }
 
+const registerSocialNotificationRoutes = require('./routes/socialNotifications');
+registerSocialNotificationRoutes(app, { client, checkAuth });
+
 // 🐾 變數替換輔助函式（防止未載入完整 Member 物件時崩潰）
 function parsePreviewText(text, member, guild) {
     if (!text) return '';

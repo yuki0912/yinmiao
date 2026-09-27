@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>社群通知設定 | <%= botName %></title>
+    <link rel="stylesheet" href="/css/style.css">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+    <%- include('partials/navbar') %>
+
+    <main class="social-page">
+        <div class="social-header">
+            <div>
+                <span class="social-badge">📡 SOCIAL NOTIFICATIONS</span>
+                <h1>社群通知設定</h1>
+                <p><%= guildName %> · YouTube / X(Twitter) / Twitch</p>
+            </div>
+            <a class="btn-secondary" href="/manage/<%= guildId %>">← 返回功能中心</a>
+        </div>
+
+        <section class="social-panel">
+            <h2>新增 / 更新通知</h2>
+            <p class="social-help">YouTube 請填 Channel ID（例如 <code>UC...</code>）；X 填 username；Twitch 填 channel login。</p>
+
+            <form id="socialForm">
+                <input type="hidden" name="guildId" value="<%= guildId %>">
+
+                <div class="social-grid">
+                    <label>平台
+                        <select name="platform" class="form-control" required>
+                            <option value="youtube">YouTube</option>
+                            <option value="twitter">X / Twitter</option>
+                            <option value="twitch">Twitch</option>
+                        </select>
+                    </label>
+
+                    <label>帳號 / Channel ID
+                        <input name="username" class="form-control" placeholder="例如：UCxxxxxxxx / username / twitchlogin" required>
+                    </label>
+
+                    <label>Discord 通知頻道
+                        <select name="channelId" class="form-control" required>
+                            <% channels.forEach(channel => { %>
+                                <option value="<%= channel.id %>">#<%= channel.name %></option>
+                            <% }) %>
+                        </select>
+                    </label>
+
+                    <label>通知身分組（可選）
+                        <select name="roleId" class="form-control">
+                            <option value="">不標記</option>
+                            <% roles.forEach(role => { %>
+                                <option value="<%= role.id %>">@<%= role.name %></option>
+                            <% }) %>
+                        </select>
+                    </label>
+
+                    <label>Embed 標題
+                        <input name="title" class="form-control" placeholder="📢 社群更新通知">
+                    </label>
+
+                    <label>Embed 顏色
+                        <input name="color" class="form-control" value="#FFC8DD" pattern="#[0-9A-Fa-f]{6}">
+                    </label>
+                </div>
+
+                <label class="social-message">自訂前綴訊息
+                    <textarea name="customMessage" class="form-control" placeholder="例如：喵！有新內容囉～"></textarea>
+                </label>
+
+                <button class="btn-main" type="submit">🐾 儲存通知設定</button>
+                <span id="socialStatus"></span>
+            </form>
+        </section>
+
+        <section class="social-panel">
+            <h2>目前通知</h2>
+
+            <% if (!feeds.length) { %>
+                <div class="social-empty">📭 還沒有設定任何社群通知。</div>
+            <% } else { %>
+                <div class="social-list">
+                    <% feeds.forEach(feed => { %>
+                        <article class="social-item">
+                            <div>
+                                <strong>
+                                    <%= feed.platform === 'youtube' ? '▶️ YouTube' : feed.platform === 'twitter' ? '𝕏 X / Twitter' : '🟣 Twitch' %>
+                                </strong>
+                                <span class="social-name"><%= feed.username %></span>
+                                <small>→ <#%= feed.channelId %></small>
+                            </div>
+                            <button class="btn-danger-soft" data-id="<%= feed._id %>">刪除</button>
+                        </article>
+                    <% }) %>
+                </div>
+            <% } %>
+        </section>
+    </main>
+
+    <%- include('partials/footer') %>
+
+    <script>
+        const form = document.getElementById('socialForm');
+        const status = document.getElementById('socialStatus');
+
+        form.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            status.textContent = ' 儲存中…';
+
+            const data = Object.fromEntries(new FormData(form).entries());
+
+            try {
+                const response = await fetch('/api/social-notify/add', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                const result = await response.json();
+
+                if (!response.ok || result.status !== 'success') {
+                    throw new Error(result.message || '儲存失敗');
+                }
+
+                status.textContent = ' ✅ 已儲存，正在重新整理…';
+                setTimeout(() => location.reload(), 500);
+            } catch (error) {
+                status.textContent = ' ❌ ' + error.message;
+            }
+        });
+
+        document.querySelectorAll('[data-id]').forEach(button => {
+            button.addEventListener('click', async () => {
+                if (!confirm('確定要刪除這個通知設定嗎？')) return;
+
+                const response = await fetch('/api/social-notify/delete', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        guildId: '<%= guildId %>',
+                        id: button.dataset.id
+                    })
+                });
+
+                if (response.ok) location.reload();
+            });
+        });
+    </script>
+</body>
+</html>

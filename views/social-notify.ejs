@@ -89,7 +89,7 @@
                                     <%= feed.platform === 'youtube' ? '▶️ YouTube' : feed.platform === 'twitter' ? '𝕏 X / Twitter' : '🟣 Twitch' %>
                                 </strong>
                                 <span class="social-name"><%= feed.username %></span>
-                                <small>→ <#%= feed.channelId %></small>
+                                <small>→ <code><%= feed.channelId %></code></small>
                             </div>
                             <button class="btn-danger-soft" data-id="<%= feed._id %>">刪除</button>
                         </article>

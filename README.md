@@ -32,6 +32,7 @@
 - **🎂 生日系統**：管理伺服器成員生日設定。
 - **♻️ 指令熱重載**：執行期間重新載入 Slash Command。
 - **🚀 開發者全域廣播**：預覽並同步官方公告至所有伺服器。
+- **📡 社群通知系統**：YouTube、X / Twitter、Twitch 更新自動發送到 Discord。
 
 ### 📈 等級與社群
 - **✨ XP / 等級系統**：聊天獲得 XP、升級並查看排行。
@@ -79,6 +80,7 @@
 | `/test-leave` | 🧪 測試離開通知效果 |
 | `/testwelcome` | 🧪 測試歡迎訊息效果 |
 | `/view-config` | 📊 查看歡迎系統詳細設定 |
+| `/social-notify` | 📡 管理 YouTube / X(Twitter) / Twitch 通知 |
 
 ### 💰 Economy｜經濟
 | 指令 | 功能 |
@@ -150,6 +152,7 @@
 - 工單設定
 - 動態語音設定
 - Embed / 視覺化內容設定
+- YouTube / X(Twitter) / Twitch 社群通知設定
 
 ---
 ## 📦 專案技術棧與依賴 (Tech Stack)
@@ -162,7 +165,7 @@
 * **圖像渲染**：`canvas` (動態繪製歡迎卡片)
 * **網頁 Session**：`connect-mongo` & `express-session`
 * **排程任務**：`node-cron`
-* **外部工具**：`discord-oauth2`、`axios`
+* **外部工具**：`discord-oauth2`、`axios`、`rss-parser`、`twitter-api-v2`
 
 ---
 
@@ -179,6 +182,12 @@ GUILD_ID=你的測試伺服器ID
 MONGODB_URI=你的MongoDB連接字串
 PORT=3000
 TZ=Asia/Kuala_Lumpur
+
+# 社群通知（依平台需求設定）
+X_BEARER_TOKEN=你的X_API_Bearer_Token
+TWITCH_CLIENT_ID=你的Twitch_Client_ID
+TWITCH_CLIENT_SECRET=你的Twitch_Client_Secret
+SOCIAL_NOTIFICATION_INTERVAL=60000
 ```
 
 ### 2. 安裝依賴

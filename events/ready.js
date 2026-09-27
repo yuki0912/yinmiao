@@ -4,6 +4,7 @@ const PendingRole = require('../models/PendingRole');
 const GuildConfig = require('../models/GuildConfig'); // 引入設定模型
 const TempChannel = require('../models/TempChannel'); // 💡 引入動態語音資料模型
 const { initBirthdayScheduler } = require('../utils/birthdayScheduler'); // 🎂 新增：引入生日慶生排程器
+const { startSocialNotificationService } = require('../services/socialNotificationService'); // 📡 YouTube / X / Twitch 通知
 
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -135,6 +136,13 @@ module.exports = {
             initBirthdayScheduler(client);
         } catch (err) {
             console.error('[錯誤] 啟動生日定時排程失敗:', err.message);
+        }
+
+        // --- 5. 啟動 YouTube / X(Twitter) / Twitch 社群通知服務 ---
+        try {
+            startSocialNotificationService(client);
+        } catch (err) {
+            console.error('[錯誤] 啟動社群通知服務失敗:', err.message);
         }
 
         // --- 5. 動態狀態輪換 ---

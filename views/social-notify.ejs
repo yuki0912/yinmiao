@@ -22,14 +22,14 @@
 
         <section class="social-panel">
             <h2>新增 / 更新通知</h2>
-            <p class="social-help">YouTube 請填 Channel ID（例如 <code>UC...</code>）；X 填 username；Twitch 填 channel login。</p>
+            <p class="social-help">YouTube 請填 Channel ID（例如 <code>UC...</code>）；X / Twitter 請先在 RSS.app 建立公開帳號 RSS，再把 XML Feed URL 貼到下方；Twitch 填 channel login。</p>
 
             <form id="socialForm">
                 <input type="hidden" name="guildId" value="<%= guildId %>">
 
                 <div class="social-grid">
                     <label>平台
-                        <select name="platform" class="form-control" required>
+                        <select name="platform" id="socialPlatform" class="form-control" required>
                             <option value="youtube">YouTube</option>
                             <option value="twitter">X / Twitter</option>
                             <option value="twitch">Twitch</option>
@@ -38,6 +38,11 @@
 
                     <label>帳號 / Channel ID
                         <input name="username" class="form-control" placeholder="例如：UCxxxxxxxx / username / twitchlogin" required>
+                    </label>
+
+                    <label id="rssUrlField" style="display:none; grid-column: 1 / -1;">X RSS Feed URL
+                        <input name="rssUrl" id="rssUrl" class="form-control" placeholder="https://rss.app/feeds/xxxxxxxxxxxxxxxx.xml">
+                        <small class="social-help">這是 RSS.app 產生的 XML Feed URL，不是你的 X 個人頁 URL。</small>
                     </label>
 
                     <label>Discord 通知頻道
@@ -89,7 +94,7 @@
                                     <%= feed.platform === 'youtube' ? '▶️ YouTube' : feed.platform === 'twitter' ? '𝕏 X / Twitter' : '🟣 Twitch' %>
                                 </strong>
                                 <span class="social-name"><%= feed.username %></span>
-                                <small>→ <code><%= feed.channelId %></code></small>
+                                <small>→ <code><%= feed.platform === 'twitter' ? 'RSS Feed 已設定' : feed.channelId %></code></small>
                             </div>
                             <button class="btn-danger-soft" data-id="<%= feed._id %>">刪除</button>
                         </article>
@@ -104,6 +109,18 @@
     <script>
         const form = document.getElementById('socialForm');
         const status = document.getElementById('socialStatus');
+        const platform = document.getElementById('socialPlatform');
+        const rssUrlField = document.getElementById('rssUrlField');
+        const rssUrl = document.getElementById('rssUrl');
+
+        function updatePlatformFields() {
+            const isTwitter = platform.value === 'twitter';
+            rssUrlField.style.display = isTwitter ? 'block' : 'none';
+            rssUrl.required = isTwitter;
+        }
+
+        platform.addEventListener('change', updatePlatformFields);
+        updatePlatformFields();
 
         form.addEventListener('submit', async (event) => {
             event.preventDefault();

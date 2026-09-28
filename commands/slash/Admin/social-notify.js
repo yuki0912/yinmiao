@@ -8,6 +8,7 @@ const SocialNotification = require('../../../models/SocialNotification');
 const {
     normalizePlatform,
     cleanUsername,
+    isValidRssUrl,
     poll
 } = require('../../../services/socialNotificationService');
 
@@ -33,6 +34,10 @@ module.exports = {
                 .setName('username')
                 .setDescription('YouTube Channel ID / X username / Twitch login')
                 .setRequired(true))
+            .addStringOption(opt => opt
+                .setName('rss_url')
+                .setDescription('X 專用：RSS.app 產生的 RSS Feed URL')
+                .setRequired(false))
             .addChannelOption(opt => opt
                 .setName('channel')
                 .setDescription('Discord 通知頻道')
@@ -84,6 +89,7 @@ module.exports = {
 
         const platform = normalizePlatform(interaction.options.getString('platform'));
         const username = cleanUsername(platform, interaction.options.getString('username'));
+        const rssUrl = interaction.options.getString('rss_url');
         const channel = interaction.options.getChannel('channel');
         const role = interaction.options.getRole('role');
 
@@ -97,13 +103,21 @@ module.exports = {
             });
         }
 
+        if (platform === 'twitter' && !isValidRssUrl(rssUrl)) {
+            return interaction.reply({
+                content: '❌ X / Twitter 需要 RSS Feed URL。請先用 RSS.app 建立公開 X 帳號的 RSS，再把 XML Feed URL 填到 `rss_url`。',
+                ephemeral: true
+            });
+        }
+
         try {
             const feed = await SocialNotification.findOneAndUpdate(
                 { guildId, platform, username, channelId: channel.id },
                 {
                     $set: {
                         roleId: role?.id || null,
-                        enabled: true
+                        enabled: true,
+                        ...(platform === 'twitter' ? { sourceId: rssUrl.trim() } : {})
                     },
                     $setOnInsert: {
                         guildId,
@@ -115,6 +129,11 @@ module.exports = {
                 { upsert: true, new: true }
             );
 
+            if (platform === 'twitter' && feed.lastItemId) {
+                feed.lastItemId = null;
+                await feed.save();
+            }
+
             // 建立後立即做一次掃描，第一次只會建立基準，不會把舊內容洗版。
             await poll(interaction.client);
 
@@ -123,9 +142,11 @@ module.exports = {
                     `✅ 已新增 **${platform} / ${username}** 通知。\n` +
                     `📢 頻道：<#${channel.id}>\n` +
                     (role ? `🏷️ 標記：<@&${role.id}>\n` : '') +
-                    (platform === 'youtube'
-                        ? '💡 YouTube 請填 Channel ID（例如 UC...）。'
-                        : ''),
+                    (platform === 'twitter'
+                        ? '🔗 X RSS：已設定 RSS Feed URL。'
+                        : platform === 'youtube'
+                            ? '💡 YouTube 請填 Channel ID（例如 UC...）。'
+                            : ''),
                 ephemeral: true
             });
         } catch (error) {

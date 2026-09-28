@@ -162,7 +162,7 @@
 * **圖像渲染**：`canvas` (動態繪製歡迎卡片)
 * **網頁 Session**：`connect-mongo` & `express-session`
 * **排程任務**：`node-cron`
-* **外部工具**：`discord-oauth2`、`axios`、`rss-parser`
+* **外部工具**：`discord-oauth2`、`axios`
 
 ---
 

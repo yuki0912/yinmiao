@@ -1,5 +1,5 @@
 const SocialNotification = require('../models/SocialNotification');
-const { normalizePlatform, cleanUsername, poll } = require('../services/socialNotificationService');
+const { normalizePlatform, cleanUsername, isValidRssUrl, poll } = require('../services/socialNotificationService');
 
 function registerSocialNotificationRoutes(app, { client, checkAuth }) {
     app.get('/manage/:guildId/social-notify', checkAuth, async (req, res) => {
@@ -34,7 +34,7 @@ function registerSocialNotificationRoutes(app, { client, checkAuth }) {
 
     app.post('/api/social-notify/add', checkAuth, async (req, res) => {
         try {
-            const { guildId, platform, username, channelId, roleId, title, customMessage, color } = req.body;
+            const { guildId, platform, username, rssUrl, channelId, roleId, title, customMessage, color } = req.body;
 
             if (!guildId || !platform || !username || !channelId) {
                 return res.status(400).json({ status: 'error', message: '缺少必要欄位喵！' });
@@ -51,6 +51,13 @@ function registerSocialNotificationRoutes(app, { client, checkAuth }) {
 
             const normalizedUsername = cleanUsername(normalizedPlatform, username);
 
+            if (normalizedPlatform === 'twitter' && !isValidRssUrl(rssUrl)) {
+                return res.status(400).json({
+                    status: 'error',
+                    message: 'X / Twitter 請填 RSS.app 產生的 RSS Feed URL。'
+                });
+            }
+
             const feed = await SocialNotification.findOneAndUpdate(
                 { guildId, platform: normalizedPlatform, username: normalizedUsername, channelId },
                 {
@@ -59,7 +66,8 @@ function registerSocialNotificationRoutes(app, { client, checkAuth }) {
                         title: title || '',
                         customMessage: customMessage || '',
                         color: /^#[0-9A-F]{6}$/i.test(color || '') ? color : '#FFC8DD',
-                        enabled: true
+                        enabled: true,
+                        ...(normalizedPlatform === 'twitter' ? { sourceId: rssUrl.trim() } : {})
                     },
                     $setOnInsert: {
                         guildId,
@@ -70,6 +78,11 @@ function registerSocialNotificationRoutes(app, { client, checkAuth }) {
                 },
                 { upsert: true, new: true }
             );
+
+            if (normalizedPlatform === 'twitter' && feed.lastItemId) {
+                feed.lastItemId = null;
+                await feed.save();
+            }
 
             await poll(client);
             res.json({ status: 'success', feed });

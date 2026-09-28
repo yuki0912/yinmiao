@@ -32,7 +32,6 @@
 - **🎂 生日系統**：管理伺服器成員生日設定。
 - **♻️ 指令熱重載**：執行期間重新載入 Slash Command。
 - **🚀 開發者全域廣播**：預覽並同步官方公告至所有伺服器。
-- **📡 社群通知系統**：YouTube、X / Twitter、Twitch 更新自動發送到 Discord；X / Twitter 使用 RSS Feed，不需要 X API Bearer Token。
 
 ### 📈 等級與社群
 - **✨ XP / 等級系統**：聊天獲得 XP、升級並查看排行。
@@ -80,7 +79,6 @@
 | `/test-leave` | 🧪 測試離開通知效果 |
 | `/testwelcome` | 🧪 測試歡迎訊息效果 |
 | `/view-config` | 📊 查看歡迎系統詳細設定 |
-| `/social-notify` | 📡 管理 YouTube / X(Twitter) / Twitch 通知 |
 
 ### 💰 Economy｜經濟
 | 指令 | 功能 |
@@ -152,7 +150,6 @@
 - 工單設定
 - 動態語音設定
 - Embed / 視覺化內容設定
-- YouTube / X(Twitter) / Twitch 社群通知設定
 
 ---
 ## 📦 專案技術棧與依賴 (Tech Stack)
@@ -183,11 +180,6 @@ MONGODB_URI=你的MongoDB連接字串
 PORT=3000
 TZ=Asia/Kuala_Lumpur
 
-# 社群通知
-# X / Twitter 不需要 X_BEARER_TOKEN；在社群通知設定中填入 RSS Feed URL。
-TWITCH_CLIENT_ID=你的Twitch_Client_ID
-TWITCH_CLIENT_SECRET=你的Twitch_Client_Secret
-SOCIAL_NOTIFICATION_INTERVAL=60000
 ```
 
 ### 2. 安裝依賴
@@ -216,19 +208,6 @@ npm install pm2-windows-startup -g
 pm2-startup install
 pm2 save
 ```
-
----
-
-## 📡 X / Twitter RSS 設定
-
-1. 開啟 RSS.app 的 X / Twitter RSS Generator。
-2. 輸入要追蹤的公開 X 帳號，例如 `@otozaka_yuki85`。
-3. 建立並儲存 Feed，複製產生的 **XML RSS Feed URL**。
-4. 到銀喵 Web 控制台的「社群通知」選擇 **X / Twitter**。
-5. Username 填 `otozaka_yuki85`，RSS Feed URL 貼上剛剛複製的 XML URL。
-6. 儲存後，銀喵會每隔 `SOCIAL_NOTIFICATION_INTERVAL` 檢查一次 Feed；第一次只建立基準，不會把舊貼文一次發到 Discord。
-
-RSS.app 的 X Feed 只適用於公開、無需登入即可查看的 X 帳號；Feed 的實際刷新頻率取決於 RSS.app 方案。
 
 ---
 

@@ -1,6 +1,5 @@
 const axios = require('axios');
 const Parser = require('rss-parser');
-const { TwitterApi } = require('twitter-api-v2');
 const { EmbedBuilder } = require('discord.js');
 const SocialNotification = require('../models/SocialNotification');
 
@@ -18,6 +17,15 @@ function cleanUsername(platform, username) {
     const value = String(username || '').trim();
     if (platform === 'twitter' || platform === 'twitch') return value.replace(/^@/, '');
     return value;
+}
+
+function isValidRssUrl(url) {
+    try {
+        const parsed = new URL(String(url || '').trim());
+        return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+    } catch {
+        return false;
+    }
 }
 
 function validHex(color) {
@@ -65,36 +73,32 @@ async function fetchYouTube(feed) {
 }
 
 async function fetchTwitter(feed) {
-    if (!process.env.X_BEARER_TOKEN) {
-        throw new Error('缺少 X_BEARER_TOKEN');
+    const rssUrl = String(feed.sourceId || '').trim();
+
+    if (!isValidRssUrl(rssUrl)) {
+        throw new Error('X / Twitter 請先建立 RSS Feed，並把 RSS Feed URL 填入設定');
     }
 
-    const api = new TwitterApi(process.env.X_BEARER_TOKEN);
-    let userId = feed.sourceId;
-
-    if (!userId) {
-        const result = await api.v2.userByUsername(cleanUsername('twitter', feed.username));
-        userId = result.data?.id;
-        if (!userId) throw new Error('找不到 X 使用者');
-        feed.sourceId = userId;
-    }
-
-    const result = await api.v2.userTimeline(userId, {
-        max_results: 5,
-        exclude: ['replies', 'retweets'],
-        'tweet.fields': ['created_at', 'text']
+    const response = await axios.get(rssUrl, {
+        timeout: 20000,
+        responseType: 'text',
+        headers: { 'User-Agent': 'YinMiao-SocialNotify/1.0' }
     });
 
-    const tweet = result.data?.data?.[0];
-    if (!tweet) return null;
+    const parsed = await parser.parseString(response.data);
+    const item = parsed.items?.[0];
+    if (!item) return null;
+
+    const username = cleanUsername('twitter', feed.username);
+    const tweetUrl = item.link || item.guid;
 
     return {
-        id: tweet.id,
-        title: `@${cleanUsername('twitter', feed.username)} 的新貼文`,
-        url: `https://x.com/${encodeURIComponent(cleanUsername('twitter', feed.username))}/status/${tweet.id}`,
-        author: `@${cleanUsername('twitter', feed.username)}`,
-        description: tweet.text,
-        publishedAt: tweet.created_at
+        id: item.guid || item.id || tweetUrl,
+        title: `@${username} 的新貼文`,
+        url: tweetUrl,
+        author: item.creator || item.author || `@${username}`,
+        description: item.contentSnippet || item.content || item.title || '',
+        publishedAt: item.isoDate || item.pubDate
     };
 }
 
@@ -251,5 +255,6 @@ module.exports = {
     stopSocialNotificationService,
     normalizePlatform,
     cleanUsername,
+    isValidRssUrl,
     poll
 };

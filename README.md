@@ -56,7 +56,7 @@
 
 ## 🛠️ Slash Commands
 
-目前 Slash Commands 共 **45 個**，分為 **Admin、Economy、Fun、General、TRPG** 五大分類。直接在 Discord 輸入 `/` 即可使用；部分管理指令會依 Discord 權限限制。
+Slash Commands 分為 **Admin、Economy、Fun、General、TRPG** 五大分類。TRPG 已整合為單一 `/trpg` 主指令，使用子指令管理整個冒險系統。直接在 Discord 輸入 `/` 即可使用；部分管理指令會依 Discord 權限限制。
 
 ### ⚙️ Admin｜管理與設定
 | 指令 | 功能 |

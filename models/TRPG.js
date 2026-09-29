@@ -34,7 +34,8 @@ const TRPGSchema = new mongoose.Schema({
         emoji: { type: String, default: '⚔️' },
         weapon: { type: String, default: '徒手' },
         skill: { type: String, default: '無' },
-        proficiency: { type: String, default: 'STR' }
+        proficiency: { type: String, default: 'STR' },
+        damage: { type: String, default: '1d6' }
     },
     attributes: {
         str: { type: Number, default: 10, min: 1, max: 30 },
@@ -47,6 +48,14 @@ const TRPGSchema = new mongoose.Schema({
     hp: { type: Number, default: 10 },
     maxHp: { type: Number, default: 10 },
     ac: { type: Number, default: 10 }
+    gold: { type: Number, default: 100, min: 0 },
+    inventory: [{
+        name: { type: String },
+        type: { type: String, default: 'misc' },
+        quantity: { type: Number, default: 1, min: 0 },
+        effect: { type: Number, default: 0 },
+        description: { type: String, default: '' }
+    }],
 }, { timestamps: true });
 
 // 複合唯一索引：同一位玩家不能創建重複名稱的角色卡

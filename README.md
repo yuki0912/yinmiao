@@ -114,13 +114,16 @@
 ### 🎲 TRPG｜角色扮演
 | 指令 | 功能 |
 | :--- | :--- |
-| `/adventure` | 🧭 消耗銀喵幣開啟隨機冒險 |
-| `/character` | 🎭 TRPG 角色卡系統 |
-| `/check` | 🎲 D20 屬性檢定 |
-| `/dice` | 🎲 TRPG 骰子系統 |
-| `/skill` | 🎯 TRPG 技能檢定 |
-| `/stats-buy` | 💊 消耗銀喵幣提升屬性 |
-| `/story` | 📖 生成 TRPG 故事開場 |
+| `/trpg character create` | 🎭 建立角色卡 |
+| `/trpg character list` | 📚 查看自己的角色 |
+| `/trpg character view` | 🔍 查看角色資料 |
+| `/trpg character delete` | 🪦 刪除角色 |
+| `/trpg roll` | 🎲 自由骰子 |
+| `/trpg check` | 🎯 D20 屬性檢定 |
+| `/trpg battle` | ⚔️ 隨機遭遇戰 |
+| `/trpg heal` | ❤️ 回復生命 |
+| `/trpg rest` | 🛏️ 完全休息 |
+| `/trpg inventory` | 🎒 查看裝備 |
 
 ---
 

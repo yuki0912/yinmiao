@@ -205,6 +205,7 @@ module.exports={
 async function core(i,s){
     if(s==='roll')return dice(i); if(s==='check')return check(i); if(s==='battle')return battle(i); if(s==='heal')return heal(i); if(s==='rest')return rest(i); if(s==='inventory')return inventory(i); if(s==='achievement')return achievement(i);
 }
+async function character(i,s){
     if(s==='create'){
         const name=(i.options.getString('name')||`冒險者・${i.user.username}`).trim();
         const rk=i.options.getString('race')||Object.keys(RACES)[d(Object.keys(RACES).length)-1];

@@ -117,6 +117,14 @@ async function awardAchievements(c){
 module.exports={
     category:'TRPG',
     data:new SlashCommandBuilder().setName('trpg').setDescription('🎲 完整 TRPG 冒險系統').setDMPermission(false)
+    .addSubcommandGroup(g=>g.setName('core').setDescription('🎲 核心冒險')
+        .addSubcommand(s=>s.setName('roll').setDescription('擲骰子').addStringOption(o=>o.setName('dice').setDescription('例如 1d20、2d6+3').setRequired(true)))
+        .addSubcommand(s=>s.setName('check').setDescription('D20 屬性檢定').addStringOption(o=>o.setName('stat').setDescription('屬性').setRequired(true).addChoices(...Object.entries(STATS).map(([v,n])=>({name:`${n} (${v.toUpperCase()})`,value:v})))).addIntegerOption(o=>o.setName('dc').setDescription('DC').setMinValue(1).setMaxValue(40)).addStringOption(o=>o.setName('name').setDescription('角色名稱')))
+        .addSubcommand(s=>s.setName('battle').setDescription('隨機遭遇戰').addStringOption(o=>o.setName('name').setDescription('角色名稱')))
+        .addSubcommand(s=>s.setName('heal').setDescription('使用治療藥水').addStringOption(o=>o.setName('name').setDescription('角色名稱')))
+        .addSubcommand(s=>s.setName('rest').setDescription('完全休息').addStringOption(o=>o.setName('name').setDescription('角色名稱')))
+        .addSubcommand(s=>s.setName('inventory').setDescription('查看背包').addStringOption(o=>o.setName('name').setDescription('角色名稱')))
+        .addSubcommand(s=>s.setName('achievement').setDescription('查看成就').addStringOption(o=>o.setName('name').setDescription('角色名稱'))))
     .addSubcommandGroup(g=>g.setName('character').setDescription('🎭 角色卡管理')
         .addSubcommand(s=>s.setName('create').setDescription('建立角色').addStringOption(o=>o.setName('name').setDescription('角色名稱'))
             .addStringOption(o=>o.setName('race').setDescription('種族').addChoices(...Object.entries(RACES).map(([v,x])=>({name:`${x[1]} ${x[0]}`,value:v}))))
@@ -124,12 +132,6 @@ module.exports={
         .addSubcommand(s=>s.setName('list').setDescription('查看你的所有角色'))
         .addSubcommand(s=>s.setName('view').setDescription('查看角色').addStringOption(o=>o.setName('name').setDescription('角色名稱')).addUserOption(o=>o.setName('user').setDescription('查看其他玩家')))
         .addSubcommand(s=>s.setName('delete').setDescription('永久刪除角色').addStringOption(o=>o.setName('name').setDescription('角色名稱').setRequired(true))))
-    .addSubcommand(s=>s.setName('roll').setDescription('🎲 擲骰子').addStringOption(o=>o.setName('dice').setDescription('例如 1d20、2d6+3').setRequired(true)))
-    .addSubcommand(s=>s.setName('check').setDescription('🎯 D20 屬性檢定').addStringOption(o=>o.setName('stat').setDescription('屬性').setRequired(true).addChoices(...Object.entries(STATS).map(([v,n])=>({name:`${n} (${v.toUpperCase()})`,value:v})))).addIntegerOption(o=>o.setName('dc').setDescription('DC').setMinValue(1).setMaxValue(40)).addStringOption(o=>o.setName('name').setDescription('角色名稱')))
-    .addSubcommand(s=>s.setName('battle').setDescription('⚔️ 隨機遭遇戰').addStringOption(o=>o.setName('name').setDescription('角色名稱')))
-    .addSubcommand(s=>s.setName('heal').setDescription('🧪 使用治療藥水').addStringOption(o=>o.setName('name').setDescription('角色名稱')))
-    .addSubcommand(s=>s.setName('rest').setDescription('🛏️ 完全休息').addStringOption(o=>o.setName('name').setDescription('角色名稱')))
-    .addSubcommand(s=>s.setName('inventory').setDescription('🎒 查看背包').addStringOption(o=>o.setName('name').setDescription('角色名稱')))
     .addSubcommandGroup(g=>g.setName('campaign').setDescription('🏰 Campaign 冒險團')
         .addSubcommand(s=>s.setName('create').setDescription('建立 Campaign').addStringOption(o=>o.setName('name').setDescription('Campaign 名稱').setRequired(true)).addStringOption(o=>o.setName('description').setDescription('冒險簡介')))
         .addSubcommand(s=>s.setName('list').setDescription('查看 Campaign'))
@@ -152,12 +154,14 @@ module.exports={
         .addSubcommand(s=>s.setName('view').setDescription('怪物資料').addStringOption(o=>o.setName('key').setDescription('怪物代號').setRequired(true))))
     .addSubcommandGroup(g=>g.setName('skill').setDescription('⚔️ 技能')
         .addSubcommand(s=>s.setName('list').setDescription('技能列表'))
-        .addSubcommand(s=>s.setName('use').setDescription('戰鬥中使用技能').addStringOption(o=>o.setName('skill').setDescription('技能代號').setRequired(true))))
+        .addSubcommand(s=>s.setName('use').setDescription('使用技能').addStringOption(o=>o.setName('skill').setDescription('技能代號').setRequired(true))))
     .addSubcommandGroup(g=>g.setName('spell').setDescription('🧙 法術')
         .addSubcommand(s=>s.setName('list').setDescription('法術列表'))
         .addSubcommand(s=>s.setName('cast').setDescription('施放法術').addStringOption(o=>o.setName('spell').setDescription('法術代號').setRequired(true))))
     .addSubcommandGroup(g=>g.setName('equipment').setDescription('🎒 裝備')
-        .addSubcommand(s=>s.setName('list').setDescription('查看裝備')).addSubcommand(s=>s.setName('equip').setDescription('裝備物品').addStringOption(o=>o.setName('item').setDescription('物品名稱').setRequired(true))).addSubcommand(s=>s.setName('unequip').setDescription('卸下裝備').addStringOption(o=>o.setName('slot').setDescription('欄位').setRequired(true).addChoices({name:'武器',value:'weapon'},{name:'護甲',value:'armor'},{name:'飾品',value:'accessory'}))))
+        .addSubcommand(s=>s.setName('list').setDescription('查看裝備'))
+        .addSubcommand(s=>s.setName('equip').setDescription('裝備物品').addStringOption(o=>o.setName('item').setDescription('物品名稱').setRequired(true)))
+        .addSubcommand(s=>s.setName('unequip').setDescription('卸下裝備').addStringOption(o=>o.setName('slot').setDescription('欄位').setRequired(true).addChoices({name:'武器',value:'weapon'},{name:'護甲',value:'armor'},{name:'飾品',value:'accessory'}))))
     .addSubcommandGroup(g=>g.setName('shop').setDescription('💰 商店')
         .addSubcommand(s=>s.setName('list').setDescription('查看商店'))
         .addSubcommand(s=>s.setName('buy').setDescription('購買物品').addStringOption(o=>o.setName('item').setDescription('物品代號').setRequired(true)).addIntegerOption(o=>o.setName('quantity').setDescription('數量').setMinValue(1).setMaxValue(99)))
@@ -165,14 +169,13 @@ module.exports={
     .addSubcommandGroup(g=>g.setName('quest').setDescription('📜 任務')
         .addSubcommand(s=>s.setName('list').setDescription('任務列表').addStringOption(o=>o.setName('campaign').setDescription('Campaign 名稱').setRequired(true)))
         .addSubcommand(s=>s.setName('accept').setDescription('接受任務').addStringOption(o=>o.setName('id').setDescription('任務代號').setRequired(true)).addStringOption(o=>o.setName('campaign').setDescription('Campaign 名稱').setRequired(true)))
-        .addSubcommand(s=>s.setName('complete').setDescription('完成目前任務').addStringOption(o=>o.setName('campaign').setDescription('Campaign 名稱').setRequired(true))))
-    .addSubcommand(s=>s.setName('achievement').setDescription('🏆 查看成就').addStringOption(o=>o.setName('name').setDescription('角色名稱')));
+        .addSubcommand(s=>s.setName('complete').setDescription('完成目前任務').addStringOption(o=>o.setName('campaign').setDescription('Campaign 名稱').setRequired(true))));
 
     async execute(i){
         try{
             if(!i.guildId)return i.reply({content:'❌ TRPG 只能在伺服器使用。',ephemeral:true});
             const g=i.options.getSubcommandGroup(false),s=i.options.getSubcommand();
-            if(g==='character')return character(i,s);
+            if(g==='core')return core(i,s);\n            if(g==='character')return character(i,s);
             if(g==='campaign')return campaign(i,s);
             if(g==='gm')return gm(i);
             if(g==='party')return party(i,s);
@@ -198,7 +201,7 @@ module.exports={
     }
 };
 
-async function character(i,s){
+async function core(i,s){\n    if(s==='roll')return dice(i); if(s==='check')return check(i); if(s==='battle')return battle(i); if(s==='heal')return heal(i); if(s==='rest')return rest(i); if(s==='inventory')return inventory(i); if(s==='achievement')return achievement(i);\n}\nasync function character(i,s){
     if(s==='create'){
         const name=(i.options.getString('name')||`冒險者・${i.user.username}`).trim();
         const rk=i.options.getString('race')||Object.keys(RACES)[d(Object.keys(RACES).length)-1];

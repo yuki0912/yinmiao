@@ -111,19 +111,30 @@ Slash Commands 分為 **Admin、Economy、Fun、General、TRPG** 五大分類。
 | `/pinterest` | 📌 搜尋 Pinterest 日本站內容 |
 | `/pixiv` | 🎨 搜尋 Pixiv 插畫與二創 |
 
-### 🎲 TRPG｜角色扮演
-| 指令 | 功能 |
-| :--- | :--- |
-| `/trpg character create` | 🎭 建立角色卡 |
-| `/trpg character list` | 📚 查看自己的角色 |
-| `/trpg character view` | 🔍 查看角色資料 |
-| `/trpg character delete` | 🪦 刪除角色 |
-| `/trpg roll` | 🎲 自由骰子 |
-| `/trpg check` | 🎯 D20 屬性檢定 |
-| `/trpg battle` | ⚔️ 隨機遭遇戰 |
-| `/trpg heal` | ❤️ 回復生命 |
-| `/trpg rest` | 🛏️ 完全休息 |
-| `/trpg inventory` | 🎒 查看裝備 |
+### 🎲 TRPG｜完整冒險系統
+TRPG 已整合為單一 `/trpg` 主指令，並以 Subcommand Group 分成不同模組。
+
+| 模組 | 指令 | 功能 |
+| :--- | :--- | :--- |
+| 核心 | `/trpg core roll` | 🎲 自由骰子 |
+| 核心 | `/trpg core check` | 🎯 D20 屬性檢定 |
+| 核心 | `/trpg core battle` | ⚔️ 隨機遭遇戰 |
+| 核心 | `/trpg core heal` | ❤️ 使用治療藥水 |
+| 核心 | `/trpg core rest` | 🛏️ 完全休息 |
+| 角色 | `/trpg character create/list/view/delete` | 🎭 角色卡管理 |
+| Campaign | `/trpg campaign create/list/join/leave/start/end/info/story` | 🏰 GM 劇情與冒險團 |
+| GM | `/trpg gm set` | 🎭 更換 GM |
+| 組隊 | `/trpg party view/kick` | 👥 玩家隊伍管理 |
+| 地圖 | `/trpg map view/move` | 🗺️ 地圖與探索 |
+| 怪物 | `/trpg monster list/view` | 👾 怪物資料庫 |
+| 技能 | `/trpg skill list/use` | ⚔️ 技能系統 |
+| 法術 | `/trpg spell list/cast` | 🧙 法術系統 |
+| 裝備 | `/trpg equipment list/equip/unequip` | 🎒 裝備欄 |
+| 商店 | `/trpg shop list/buy/sell` | 💰 TRPG 商店 |
+| 任務 | `/trpg quest list/accept/complete` | 📜 任務系統 |
+| 成就 | `/trpg core achievement` | 🏆 成就與獎勵 |
+
+TRPG 角色資料、Campaign、隊伍、怪物資料會儲存在 MongoDB；角色同時支援 HP、MP、XP、金幣、背包、裝備、技能、法術、任務與成就進度。
 
 ---
 

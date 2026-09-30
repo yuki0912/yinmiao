@@ -175,7 +175,8 @@ module.exports={
         try{
             if(!i.guildId)return i.reply({content:'❌ TRPG 只能在伺服器使用。',ephemeral:true});
             const g=i.options.getSubcommandGroup(false),s=i.options.getSubcommand();
-            if(g==='core')return core(i,s);\n            if(g==='character')return character(i,s);
+            if(g==='core')return core(i,s);
+            if(g==='character')return character(i,s);
             if(g==='campaign')return campaign(i,s);
             if(g==='gm')return gm(i);
             if(g==='party')return party(i,s);

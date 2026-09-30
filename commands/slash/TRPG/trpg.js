@@ -169,7 +169,7 @@ module.exports={
     .addSubcommandGroup(g=>g.setName('quest').setDescription('📜 任務')
         .addSubcommand(s=>s.setName('list').setDescription('任務列表').addStringOption(o=>o.setName('campaign').setDescription('Campaign 名稱').setRequired(true)))
         .addSubcommand(s=>s.setName('accept').setDescription('接受任務').addStringOption(o=>o.setName('id').setDescription('任務代號').setRequired(true)).addStringOption(o=>o.setName('campaign').setDescription('Campaign 名稱').setRequired(true)))
-        .addSubcommand(s=>s.setName('complete').setDescription('完成目前任務').addStringOption(o=>o.setName('campaign').setDescription('Campaign 名稱').setRequired(true))));
+        .addSubcommand(s=>s.setName('complete').setDescription('完成目前任務').addStringOption(o=>o.setName('campaign').setDescription('Campaign 名稱').setRequired(true)))),
 
     async execute(i){
         try{

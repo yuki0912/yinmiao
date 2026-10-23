@@ -436,51 +436,128 @@ app.post('/api/save-config', async (req, res) => {
 
         const updateData = {};
 
-        const isWelcomeForm = rawData.welcomeChannelId !== undefined || rawData.welcomeContent !== undefined || rawData.embedColor !== undefined || rawData.welcomeEmbedColor !== undefined || rawData.canvasMainText !== undefined || rawData.canvasSubText !== undefined;
-        const isRulesForm = rawData.rulesChannelId !== undefined || rawData.rulesTitle !== undefined;
-        const isTicketForm = rawData.ticketChannelId !== undefined || rawData.ticketTitle !== undefined;
+        // 僅更新本次請求實際傳入的欄位，避免部分更新把其他開關意外重設為 false。
+        const welcomeFieldMap = {
+            welcomeChannelId: 'welcomeChannelId',
+            welcomeContent: 'welcomeContent',
+            welcomeTitle: 'welcomeTitle',
+            welcomeDescription: 'welcomeDescription',
+            welcomeEmbedColor: 'welcomeEmbedColor',
+            embedColor: 'welcomeEmbedColor', // 舊版前端欄位名稱相容
+            welcomeImageUrl: 'welcomeImageUrl',
+            canvasText: 'canvasText',
+            canvasMainText: 'canvasText', // 舊版／新版 Canvas 主標題欄位統一保存
+            canvasSubText: 'canvasSubText',
+            canvasColor: 'canvasColor',
+            canvasSubColor: 'canvasSubColor',
+            canvasBg: 'canvasBg',
+            canvasBackgroundUrl: 'canvasBg', // 舊欄位名稱統一保存到 canvasBg
+            customBg: 'canvasBg',
+            canvasOverlayOpacity: 'canvasOverlayOpacity',
+            welcomeFooter: 'welcomeFooter',
+            leaveChannelId: 'leaveChannelId',
+            leaveContent: 'leaveContent',
+            leaveTitle: 'leaveTitle',
+            leaveDescription: 'leaveDescription',
+            leaveEmbedColor: 'leaveEmbedColor',
+            leaveFooter: 'leaveFooter'
+        };
+
+        const welcomeBooleanKeys = [
+            'sendCanvas', 'sendEmbed', 'sendLeave', 'sendLeaveEmbed',
+            'showTimestamp', 'showFooter', 'showLeaveTimestamp', 'showLeaveFooter'
+        ];
+
+        const rulesKeys = [
+            'rulesChannelId', 'rulesRoleId', 'rulesTitle', 'rulesDescription',
+            'rulesEmoji', 'rulesMessageId', 'rulesEmbedColor', 'embedTimestamp',
+            'embedAuthorName', 'embedAuthorIcon', 'embedAuthorUrl',
+            'embedThumbnail', 'embedImage', 'embedFooterText', 'embedFooterIcon'
+        ];
+
+        const ticketKeys = [
+            'ticketChannelId', 'ticketMessageId', 'ticketTitle',
+            'ticketDescription', 'ticketFooter', 'ticketColor'
+        ];
+
+        const isWelcomeForm =
+            Object.keys(welcomeFieldMap).some(key => rawData[key] !== undefined)
+            || welcomeBooleanKeys.some(key => rawData[key] !== undefined);
+        const isRulesForm = rulesKeys.some(key => rawData[key] !== undefined);
+        const isTicketForm = ticketKeys.some(key => rawData[key] !== undefined);
         const isVoiceForm = voiceSettings !== undefined;
 
         if (isWelcomeForm) {
-            const welcomeKeys = [
-                'welcomeChannelId', 'welcomeContent', 'welcomeTitle', 'welcomeDescription',
-                'embedColor', 'welcomeEmbedColor', 'welcomeImageUrl', 
-                'canvasText', 'canvasMainText', 'canvasSubText', 
-                'canvasColor', 'canvasSubColor', 'avatarBorderColor', 
-                'canvasBg', 'canvasBackgroundUrl', 'customBg', 'canvasOverlayOpacity',
-                'welcomeFooter', 'welcomeFooterIcon',
-                'leaveChannelId', 'leaveContent', 'leaveTitle', 'leaveDescription',
-                'leaveEmbedColor', 'leaveFooter'
-            ];
-            welcomeKeys.forEach(key => { if (rawData[key] !== undefined) updateData[key] = rawData[key] === '' ? null : rawData[key]; });
-            updateData.sendCanvas = rawData.sendCanvas === true || rawData.sendCanvas === 'true';
-            updateData.sendEmbed = rawData.sendEmbed === true || rawData.sendEmbed === 'true';
-            updateData.sendLeave = rawData.sendLeave === true || rawData.sendLeave === 'true';
-            updateData.sendLeaveEmbed = rawData.sendLeaveEmbed === true || rawData.sendLeaveEmbed === 'true';
-            updateData.showLeaveTimestamp = rawData.showLeaveTimestamp === true || rawData.showLeaveTimestamp === 'true';
-            updateData.showLeaveFooter = rawData.showLeaveFooter === true || rawData.showLeaveFooter === 'true';
-            if (!updateData.sendEmbed) { updateData.showTimestamp = false; updateData.showFooter = false; } else { updateData.showTimestamp = rawData.showTimestamp === true || rawData.showTimestamp === 'true'; updateData.showFooter = rawData.showFooter === true || rawData.showFooter === 'true'; }
+            for (const [inputKey, dbKey] of Object.entries(welcomeFieldMap)) {
+                if (rawData[inputKey] === undefined) continue;
+
+                // 若新欄位與舊別名同時存在，優先使用正式欄位。
+                if (inputKey === 'embedColor' && rawData.welcomeEmbedColor !== undefined) continue;
+                if (inputKey === 'canvasMainText' && rawData.canvasText !== undefined) continue;
+                if (['canvasBackgroundUrl', 'customBg'].includes(inputKey) && rawData.canvasBg !== undefined) continue;
+
+                const value = rawData[inputKey];
+
+                if (dbKey === 'canvasOverlayOpacity') {
+                    if (value === '' || value === null) {
+                        updateData[dbKey] = null;
+                    } else {
+                        const opacity = Number(value);
+                        if (!Number.isFinite(opacity) || opacity < 0 || opacity > 1) {
+                            return res.status(400).json({
+                                status: 'error',
+                                message: 'Canvas 背景遮罩透明度必須介於 0 到 1 之間。'
+                            });
+                        }
+                        updateData[dbKey] = opacity;
+                    }
+                } else {
+                    updateData[dbKey] = value === '' ? null : value;
+                }
+            }
+
+            for (const key of welcomeBooleanKeys) {
+                if (rawData[key] === undefined) continue;
+                if (typeof rawData[key] !== 'boolean' && rawData[key] !== 'true' && rawData[key] !== 'false') {
+                    return res.status(400).json({
+                        status: 'error',
+                        message: `設定欄位 ${key} 必須是布林值。`
+                    });
+                }
+                updateData[key] = rawData[key] === true || rawData[key] === 'true';
+            }
+
+            // 明確關閉 Embed 時，同步停用只適用於 Embed 的顯示選項。
+            if (rawData.sendEmbed === false || rawData.sendEmbed === 'false') {
+                updateData.showTimestamp = false;
+                updateData.showFooter = false;
+            }
         }
         if (isRulesForm) {
-            const rulesKeys = [
-                'rulesChannelId', 'rulesRoleId', 'rulesTitle', 'rulesDescription', 'rulesEmoji', 'rulesMessageId',
-                'rulesEmbedColor', 'embedTimestamp', 'embedAuthorName', 'embedAuthorIcon', 'embedAuthorUrl',
-                'embedThumbnail', 'embedImage', 'embedFooterText', 'embedFooterIcon'
-            ];
             rulesKeys.forEach(key => {
-                if (rawData[key] !== undefined) {
-                    if (key === 'embedTimestamp') {
-                        updateData[key] = rawData[key] === true || rawData[key] === 'true';
-                    } else {
-                        updateData[key] = rawData[key] === '' ? null : rawData[key];
+                if (rawData[key] === undefined) return;
+
+                if (key === 'embedTimestamp') {
+                    if (typeof rawData[key] !== 'boolean' && rawData[key] !== 'true' && rawData[key] !== 'false') {
+                        return res.status(400).json({
+                            status: 'error',
+                            message: '守則時間戳記設定必須是布林值。'
+                        });
                     }
+                    updateData[key] = rawData[key] === true || rawData[key] === 'true';
+                } else {
+                    updateData[key] = rawData[key] === '' ? null : rawData[key];
                 }
             });
             if (updateData.rulesEmoji) updateData.rulesEmoji = updateData.rulesEmoji.trim().replace(/\uFE0F/g, '');
         }
+
         if (isTicketForm) {
-            const ticketKeys = ['ticketChannelId', 'ticketMessageId', 'ticketTitle', 'ticketDescription', 'ticketFooter', 'ticketColor'];
-            ticketKeys.forEach(key => { if (rawData[key] !== undefined) updateData[key] = rawData[key] === '' ? null : rawData[key]; });
+            ticketKeys.forEach(key => {
+                if (rawData[key] !== undefined) {
+                    updateData[key] = rawData[key] === '' ? null : rawData[key];
+                }
+            });
         }
         if (isVoiceForm) {
             let finalVoiceSettings = [];

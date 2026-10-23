@@ -1,4 +1,4 @@
-const { Events, EmbedBuilder, AttachmentBuilder } = require('discord.js');
+const { Events, EmbedBuilder, AttachmentBuilder, PermissionFlagsBits } = require('discord.js');
 const { createCanvas, loadImage, registerFont } = require('canvas');
 const GuildConfig = require('../models/GuildConfig');
 const path = require('node:path');
@@ -57,15 +57,44 @@ const drawDefaultBg = (ctx, width = 800, height = 250) => {
 
 const isValidHex = (color) => /^#[0-9A-F]{6}$/i.test(color);
 
-module.exports = {
-    name: Events.GuildMemberAdd,
-    async execute(member) {
-        const { guild, user } = member;
+async function sendWelcomeMessage(member) {
+    if (!member?.guild || !member?.user) {
+        throw new Error('無效的伺服器成員資料，無法產生歡迎訊息。');
+    }
 
-        try {
-            const config = await GuildConfig.findOne({ guildId: guild.id }) || {};
-            const welcomeChannel = guild.channels.cache.get(config.welcomeChannelId) || guild.systemChannel;
-            if (!welcomeChannel) return;
+    const { guild, user } = member;
+    const config = await GuildConfig.findOne({ guildId: guild.id }) || {};
+
+    let welcomeChannel = null;
+    if (config.welcomeChannelId) {
+        welcomeChannel = guild.channels.cache.get(config.welcomeChannelId)
+            || await guild.channels.fetch(config.welcomeChannelId).catch(() => null);
+
+        if (!welcomeChannel) {
+            throw new Error(`設定的歡迎頻道（ID: ${config.welcomeChannelId}）不存在或機器人無法存取，請重新設定頻道。`);
+        }
+    } else {
+        welcomeChannel = guild.systemChannel;
+    }
+
+    if (!welcomeChannel) {
+        throw new Error('尚未設定歡迎頻道，且伺服器沒有可用的系統頻道。');
+    }
+
+    if (typeof welcomeChannel.send !== 'function' || !welcomeChannel.isTextBased?.()) {
+        throw new Error('設定的歡迎頻道不是可發送訊息的文字頻道。');
+    }
+
+    const botMember = guild.members.me;
+    if (botMember && typeof welcomeChannel.permissionsFor === 'function') {
+        const permissions = welcomeChannel.permissionsFor(botMember);
+        if (permissions && !permissions.has(PermissionFlagsBits.ViewChannel)) {
+            throw new Error('機器人沒有查看歡迎頻道的權限。');
+        }
+        if (permissions && !permissions.has(PermissionFlagsBits.SendMessages)) {
+            throw new Error('機器人沒有在歡迎頻道發送訊息的權限。');
+        }
+    }
 
             // 變數替換解析
             const replaceVars = (str, isMention = false, isCanvas = false) => {
@@ -233,15 +262,42 @@ module.exports = {
                     }
                 }
 
-                messagePayload.embeds = [welcomeEmbed];
+                const embedData = welcomeEmbed.toJSON();
+                const hasEmbedContent = Boolean(
+                    embedData.title
+                    || embedData.description
+                    || embedData.image
+                    || embedData.thumbnail
+                    || embedData.author
+                    || embedData.footer
+                    || (embedData.fields && embedData.fields.length > 0)
+                );
+
+                if (hasEmbedContent) {
+                    messagePayload.embeds = [welcomeEmbed];
+                }
             } else if (hasCanvas && attachment) {
                 messagePayload.files.push(attachment);
             }
 
-            await welcomeChannel.send(messagePayload);
+    const sentMessage = await welcomeChannel.send(messagePayload);
+    return {
+        success: true,
+        channelId: welcomeChannel.id,
+        messageId: sentMessage.id
+    };
+}
 
+module.exports = {
+    name: Events.GuildMemberAdd,
+    async execute(member) {
+        try {
+            return await sendWelcomeMessage(member);
         } catch (error) {
-            console.error(`❌ 發送歡迎訊息時發生錯誤:`, error);
+            console.error('❌ 發送歡迎訊息時發生錯誤:', error);
+            return { success: false, error };
         }
     },
+    // 提供測試指令呼叫同一套發送邏輯；錯誤會向呼叫端拋出，避免測試誤報成功。
+    sendWelcomeMessage
 };

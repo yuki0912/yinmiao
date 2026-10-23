@@ -534,8 +534,8 @@ app.post('/api/save-config', async (req, res) => {
             }
         }
         if (isRulesForm) {
-            rulesKeys.forEach(key => {
-                if (rawData[key] === undefined) return;
+            for (const key of rulesKeys) {
+                if (rawData[key] === undefined) continue;
 
                 if (key === 'embedTimestamp') {
                     if (typeof rawData[key] !== 'boolean' && rawData[key] !== 'true' && rawData[key] !== 'false') {
@@ -548,7 +548,7 @@ app.post('/api/save-config', async (req, res) => {
                 } else {
                     updateData[key] = rawData[key] === '' ? null : rawData[key];
                 }
-            });
+            }
             if (updateData.rulesEmoji) updateData.rulesEmoji = updateData.rulesEmoji.trim().replace(/\uFE0F/g, '');
         }
 

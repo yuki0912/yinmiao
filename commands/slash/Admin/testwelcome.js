@@ -1,15 +1,25 @@
-const { SlashCommandBuilder, PermissionFlagsBits, MessageFlags } = require('discord.js');
+const {
+    SlashCommandBuilder,
+    PermissionFlagsBits,
+    MessageFlags,
+    ChannelType
+} = require('discord.js');
 const welcomeEvent = require('../../../events/guildMemberAdd');
 
 module.exports = {
     category: 'Admin',
     data: new SlashCommandBuilder()
         .setName('testwelcome')
-        .setDescription('🛠️ 測試目前設定的歡迎訊息（會實際發送至歡迎頻道）')
+        .setDescription('🛠️ 測試目前設定的歡迎訊息')
         .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
         .addUserOption(option =>
             option.setName('target')
                 .setDescription('要模擬的成員（預設為你自己）')
+        )
+        .addChannelOption(option =>
+            option.setName('channel')
+                .setDescription('測試訊息發送頻道（預設使用已設定的歡迎頻道）')
+                .addChannelTypes(ChannelType.GuildText)
         ),
 
     async execute(interaction) {
@@ -23,6 +33,7 @@ module.exports = {
             }
 
             const user = interaction.options.getUser('target') || interaction.user;
+            const selectedChannel = interaction.options.getChannel('channel');
             const member = await interaction.guild.members.fetch(user.id).catch(() => null);
 
             if (!member) {
@@ -35,8 +46,10 @@ module.exports = {
                 throw new Error('歡迎事件尚未載入共用發送函式，請確認程式版本並重新部署。');
             }
 
-            // 直接呼叫實際發送函式；若頻道、權限或訊息發送失敗，會進入 catch，不會誤報成功。
-            const result = await welcomeEvent.sendWelcomeMessage(member);
+            // 指定 channel 時只覆寫這一次測試的目的地，不會更改資料庫正式設定。
+            const result = await welcomeEvent.sendWelcomeMessage(member, {
+                channel: selectedChannel || undefined
+            });
 
             if (!result?.success || !result.channelId) {
                 throw new Error('發送函式沒有回傳成功結果，請查看機器人主控台日誌。');
@@ -56,7 +69,11 @@ module.exports = {
                 lines.push(`🔗 [查看已發送的訊息](${messageLink})`);
             }
 
-            lines.push('💡 這次測試會真的在歡迎頻道發送訊息，不只是私密預覽。');
+            lines.push(
+                selectedChannel
+                    ? '💡 本次測試使用你指定的頻道，並沒有更改正式歡迎頻道設定。'
+                    : '💡 本次測試使用目前設定的歡迎頻道。'
+            );
 
             await interaction.editReply({ content: lines.join('\n') });
         } catch (error) {
@@ -64,7 +81,7 @@ module.exports = {
 
             const reason = String(error?.message || error || '未知錯誤').slice(0, 1200);
             await interaction.editReply({
-                content: `❌ **歡迎訊息測試失敗喵！**\n原因：${reason}\n\n請確認歡迎頻道設定、機器人頻道權限，並查看主控台日誌。`
+                content: `❌ **歡迎訊息測試失敗喵！**\n原因：${reason}\n\n請確認目標成員、測試頻道及機器人權限，並查看主控台日誌。`
             }).catch(replyError => {
                 console.error('回覆 Welcome Test 錯誤時再次失敗:', replyError);
             });

@@ -57,7 +57,7 @@ const drawDefaultBg = (ctx, width = 800, height = 250) => {
 
 const isValidHex = (color) => /^#[0-9A-F]{6}$/i.test(color);
 
-async function sendWelcomeMessage(member) {
+async function sendWelcomeMessage(member, { channel: overrideChannel } = {}) {
     if (!member?.guild || !member?.user) {
         throw new Error('無效的伺服器成員資料，無法產生歡迎訊息。');
     }
@@ -66,7 +66,14 @@ async function sendWelcomeMessage(member) {
     const config = await GuildConfig.findOne({ guildId: guild.id }) || {};
 
     let welcomeChannel = null;
-    if (config.welcomeChannelId) {
+
+    // 測試指令可暫時指定發送頻道；不會覆寫資料庫中的正式歡迎頻道。
+    if (overrideChannel) {
+        if (overrideChannel.guildId !== guild.id) {
+            throw new Error('指定的測試頻道不屬於目前的伺服器。');
+        }
+        welcomeChannel = overrideChannel;
+    } else if (config.welcomeChannelId) {
         welcomeChannel = guild.channels.cache.get(config.welcomeChannelId)
             || await guild.channels.fetch(config.welcomeChannelId).catch(() => null);
 
@@ -78,11 +85,11 @@ async function sendWelcomeMessage(member) {
     }
 
     if (!welcomeChannel) {
-        throw new Error('尚未設定歡迎頻道，且伺服器沒有可用的系統頻道。');
+        throw new Error('尚未設定歡迎頻道。請在指令中選擇測試頻道，或先到控制台設定正式歡迎頻道。');
     }
 
     if (typeof welcomeChannel.send !== 'function' || !welcomeChannel.isTextBased?.()) {
-        throw new Error('設定的歡迎頻道不是可發送訊息的文字頻道。');
+        throw new Error('指定的頻道不是可發送訊息的文字頻道。');
     }
 
     const botMember = guild.members.me;

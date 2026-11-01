@@ -25,7 +25,7 @@ const {
     Events
 } = require('discord.js');
 
-// --- 1. 初始化 Express 與 MongoDB 連线 Promise ---
+// --- 1. 初始化 Express 與 MongoDB 連線 Promise ---
 const app = express();
 const PORT = process.env.PORT || 3000;
 const BOT_NAME = '銀喵 YinMiao';
@@ -494,7 +494,11 @@ app.post('/api/save-config', async (req, res) => {
 
         if (Object.keys(updateData).length === 0) return res.json({ status: 'success', message: '沒有變更。' });
 
-        await GuildConfig.findOneAndUpdate({ guildId }, { $set: updateData, $unset: { voiceGeneratorId: 1, voiceNameTemplate: 1, voiceUserLimit: 1 } }, { upsert: true, new: true });
+        await GuildConfig.findOneAndUpdate(
+            { guildId }, 
+            { $set: updateData,$unset: { voiceGeneratorId: 1, voiceNameTemplate: 1, voiceUserLimit: 1 } }, 
+            { upsert: true, new: true }
+        );
 
         if (isRulesForm) await syncRulesMessage(guildId);
         if (isTicketForm) await syncTicketMessage(guildId);
@@ -698,6 +702,7 @@ async function startServer() {
             } catch (restErr) {
                 console.error('⚠️ 同步斜線指令時發生錯誤:', restErr);
             }
+
             console.log(`✅ 銀喵機器人 (${client.user.tag}) 準備就緒喵！🐾`);
         });
 

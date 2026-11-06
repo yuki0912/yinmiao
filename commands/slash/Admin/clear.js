@@ -162,16 +162,9 @@ module.exports = {
         const targetUser = interaction.options.getUser('user');
 
         try {
-            // 記錄互動從建立到進入指令的延遲，協助判斷事件迴圈阻塞或多個 Bot 程序競爭。
-            const interactionAgeMs = Date.now() - interaction.createdTimestamp;
-            console.log('[clear] 收到互動：' + interaction.id + '，進入指令時延遲 ' + interactionAgeMs + 'ms。');
-
-            // 超過 2.5 秒就不要再送出容易逾時的確認請求，並阻止事件層重覆嘗試 reply。
-            if (interactionAgeMs > 2500) {
-                interaction.__yinmiaoAckHandled = true;
-                console.error('[clear] 互動抵達指令時已接近／超過 Discord 3 秒確認期限。請檢查 Node.js event loop 或是否同時啟動多個 Bot 程序。');
-                return;
-            }
+            // 互動時間戳來自 Discord Snowflake，Date.now() 來自本機系統時鐘；
+            // 兩者可能有時鐘偏差，因此不可用差值中止指令。此處直接確認互動。
+            console.log('[clear] 收到互動：' + interaction.id + '，開始確認 Discord 互動。');
 
             // deferReply 只能確認一次。10062 代表確認逾時；40060 代表此互動已被其他處理程序確認。
             try {

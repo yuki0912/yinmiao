@@ -1,252 +1,290 @@
-const { 
-    Events, 
-    MessageFlags, 
-    EmbedBuilder, 
-    ActionRowBuilder, 
-    ButtonBuilder, 
-    ButtonStyle, 
-    ModalBuilder, 
-    TextInputBuilder, 
-    TextInputStyle 
+const {
+    Events,
+    MessageFlags,
+    EmbedBuilder,
+    ActionRowBuilder,
+    ButtonBuilder,
+    ButtonStyle,
+    ModalBuilder,
+    TextInputBuilder,
+    TextInputStyle,
+    PermissionFlagsBits
 } = require('discord.js');
 const GuildConfig = require('../models/GuildConfig');
 
-// 控制面板按鈕
-function createControlButtons(currentEmbedCount = 0) {
-    const isFull = currentEmbedCount >= 10;
-    const remaining = 10 - currentEmbedCount;
-    return new ActionRowBuilder().addComponents(
+function createEmbedControls(channelId, count) {
+    return [new ActionRowBuilder().addComponents(
         new ButtonBuilder()
-            .setCustomId('btn_add_embed')
-            .setLabel(isFull ? '❌ 已達 10 張上限' : `➕ 追加卡片 (還可加 ${remaining} 張)`)
+            .setCustomId('embed:add:' + channelId)
+            .setLabel(count >= 10 ? '已達 10 張上限' : '➕ 追加卡片（還可加 ' + (10 - count) + ' 張）')
             .setStyle(ButtonStyle.Primary)
-            .setDisabled(isFull),
+            .setDisabled(count >= 10),
         new ButtonBuilder()
-            .setCustomId('btn_finish_embed')
+            .setCustomId('embed:send:' + channelId)
             .setLabel('🚀 發送到頻道')
             .setStyle(ButtonStyle.Success)
-    );
+    )];
+}
+
+function validateUrl(value, label) {
+    if (!value) return undefined;
+    let parsed;
+    try { parsed = new URL(value.trim()); }
+    catch { throw new Error(label + '網址格式不正確。'); }
+    if (!['http:', 'https:'].includes(parsed.protocol)) throw new Error(label + '必須使用 http:// 或 https://。');
+    return parsed.href;
+}
+
+function applyUserFooter(embed, interaction) {
+    const displayName = interaction.member?.displayName || interaction.user.globalName || interaction.user.username;
+    embed.setFooter({
+        text: displayName,
+        iconURL: interaction.user.displayAvatarURL({ size: 256 })
+    });
+}
+
+function getEmbedTextLength(embed) {
+    const data = embed.toJSON();
+    const parts = [data.title, data.description, data.author?.name, data.footer?.text];
+    return parts.reduce((total, value) => total + (typeof value === 'string' ? value.length : 0), 0);
+}
+
+function getEmbedFromModal(fields, index, interaction) {
+    const read = id => fields.getTextInputValue(id).trim();
+    const embed = new EmbedBuilder();
+    const title = read('card_title');
+    const description = read('card_description');
+    const color = read('card_color');
+    const image = validateUrl(read('card_image'), 'Image');
+    const advanced = read('card_advanced');
+
+    if (title) embed.setTitle(title);
+    if (description) embed.setDescription(description);
+    if (color) {
+        if (!/^#[0-9A-F]{6}$/i.test(color)) throw new Error('Color 請使用六位色碼，例如 #0099ff。');
+        embed.setColor(color);
+    }
+
+    const settings = {};
+    for (const line of advanced.split(/\r?\n/)) {
+        if (!line.trim()) continue;
+        const splitAt = line.indexOf(':');
+        if (splitAt < 1) throw new Error('進階設定每行請使用「項目: 內容」格式。');
+        const key = line.slice(0, splitAt).trim().toLowerCase();
+        const value = line.slice(splitAt + 1).trim();
+
+        if (key === 'url') settings.url = value;
+        else if (key === 'author') settings.author = value;
+        else if (key === 'author icon') settings.authorIcon = value;
+        else if (key === 'author url') settings.authorUrl = value;
+        else if (key === 'thumbnail') settings.thumbnail = value;
+        else if (key === 'timestamp') settings.timestamp = value.toLowerCase();
+        else if (key === 'footer' || key === 'footer icon') {
+            throw new Error('Footer 已自動顯示執行指令的使用者名稱和頭像，請移除 Footer 設定。');
+        }
+        else throw new Error('不認識的進階設定項目：「' + key + '」。');
+    }
+
+    const url = validateUrl(settings.url, 'URL');
+    if (url) embed.setURL(url);
+    if (settings.author) {
+        const author = { name: settings.author };
+        const iconURL = validateUrl(settings.authorIcon, 'Author Icon');
+        const authorURL = validateUrl(settings.authorUrl, 'Author URL');
+        if (iconURL) author.iconURL = iconURL;
+        if (authorURL) author.url = authorURL;
+        embed.setAuthor(author);
+    } else if (settings.authorIcon || settings.authorUrl) {
+        throw new Error('填寫 Author Icon 或 Author URL 時，也必須填寫 Author。');
+    }
+
+    const thumbnail = validateUrl(settings.thumbnail, 'Thumbnail');
+    if (thumbnail) embed.setThumbnail(thumbnail);
+    if (image) embed.setImage(image);
+    if (settings.timestamp === 'true' || settings.timestamp === 'yes') embed.setTimestamp();
+    else if (settings.timestamp && settings.timestamp !== 'false' && settings.timestamp !== 'no') {
+        const date = new Date(settings.timestamp);
+        if (Number.isNaN(date.getTime())) throw new Error('Timestamp 請填 true、false 或有效日期。');
+        embed.setTimestamp(date);
+    }
+
+    applyUserFooter(embed, interaction);
+
+    const data = embed.toJSON();
+    if (![data.title, data.description, data.author, data.thumbnail, data.image].some(Boolean)) {
+        throw new Error('第 ' + (index + 1) + ' 張卡片沒有可顯示的內容。');
+    }
+    return embed;
+}
+
+async function fetchSendableChannel(guild, channelId) {
+    if (!guild) throw new Error('無法取得伺服器資料，請重新使用 /embed。');
+    const channel = await guild.channels.fetch(channelId).catch(() => null);
+    if (!channel || !channel.isTextBased() || channel.guildId !== guild.id) throw new Error('找不到原本設定的目標文字頻道。');
+
+    const botMember = guild.members.me || await guild.members.fetchMe().catch(() => null);
+    const permissions = botMember && channel.permissionsFor(botMember);
+    const sendPermission = typeof channel.isThread === 'function' && channel.isThread()
+        ? PermissionFlagsBits.SendMessagesInThreads
+        : PermissionFlagsBits.SendMessages;
+
+    if (!permissions || !permissions.has([PermissionFlagsBits.ViewChannel, sendPermission, PermissionFlagsBits.EmbedLinks])) {
+        throw new Error('銀喵缺少查看頻道、發送訊息或嵌入連結權限。');
+    }
+    return channel;
+}
+
+function addCardModal(channelId, currentCount) {
+    const modal = new ModalBuilder()
+        .setCustomId('embed:modal:' + channelId)
+        .setTitle('追加 Embed 卡片（目前 ' + currentCount + '/10 張）');
+
+    const inputs = [
+        ['card_title', 'Title（標題）', TextInputStyle.Short, false],
+        ['card_description', 'Description（內文）', TextInputStyle.Paragraph, false],
+        ['card_color', 'Color（例如 #0099ff）', TextInputStyle.Short, false],
+        ['card_image', 'Image URL（大圖網址）', TextInputStyle.Short, false],
+        ['card_advanced', '其他設定（Footer 自動使用你的名稱和頭像）', TextInputStyle.Paragraph, false]
+    ];
+
+    for (const [id, label, style, required] of inputs) {
+        const input = new TextInputBuilder()
+            .setCustomId(id)
+            .setLabel(label)
+            .setStyle(style)
+            .setRequired(required)
+            .setMaxLength(style === TextInputStyle.Paragraph ? 4000 : 2000);
+        if (id === 'card_advanced') {
+            input.setPlaceholder('Author: 銀喵\\nThumbnail: https://...\\nTimestamp: true\\nFooter 自動顯示你的名稱和頭像');
+        }
+        modal.addComponents(new ActionRowBuilder().addComponents(input));
+    }
+    return modal;
 }
 
 module.exports = {
     name: Events.InteractionCreate,
-    /**
-     * @param {import('discord.js').Interaction} interaction 
-     * @param {import('discord.js').Client} client 
-     */
+
     async execute(interaction, client) {
-        // 1. 斜線指令
         if (interaction.isChatInputCommand()) {
             const command = client.slashCommands.get(interaction.commandName);
-            if (!command) return;
+
+            // 指令已在 Discord 註冊，但本機沒有載入時，也必須回覆互動，不能直接 return。
+            if (!command) {
+                console.error('[interactionCreate] 找不到 Slash Command：', interaction.commandName);
+                await interaction.reply({
+                    content: '❌ 找不到這個指令的執行檔，請通知管理員檢查 Bot 指令載入狀態。',
+                    flags: [MessageFlags.Ephemeral]
+                }).catch(error => console.error('[interactionCreate] 回覆未知指令失敗:', error));
+                return;
+            }
 
             try {
                 await command.execute(interaction, client);
-            } catch (error) {
-                console.error(`執行指令 ${interaction.commandName} 出錯:`, error);
-                if (error.code === 10062 || error.code === 10008) return;
 
-                const errorResponse = { 
-                    content: '❌ 執行指令時出錯，請稍後再試。', 
-                    flags: [MessageFlags.Ephemeral] 
+                // 防止指令執行完畢卻沒有 reply/defer，讓 Discord 永遠停留在「正在回應」。
+                if (!interaction.replied && !interaction.deferred) {
+                    console.warn('[interactionCreate] 指令未回覆互動：', interaction.commandName);
+                    await interaction.reply({
+                        content: '⚠️ 指令已執行，但沒有提供互動回覆。請通知管理員檢查此指令。',
+                        flags: [MessageFlags.Ephemeral]
+                    }).catch(error => console.error('[interactionCreate] 補發互動回覆失敗:', error));
+                }
+            } catch (error) {
+                console.error('執行指令 ' + interaction.commandName + ' 出錯:', error);
+                if (error.code === 10062) {
+                    console.warn('[interactionCreate] 互動已逾時，無法再回覆：', interaction.commandName);
+                    return;
+                }
+
+                const response = {
+                    content: '❌ 執行指令時出錯，請稍後再試。',
+                    flags: [MessageFlags.Ephemeral]
                 };
 
                 if (interaction.replied || interaction.deferred) {
-                    await interaction.followUp(errorResponse).catch(() => null);
+                    await interaction.followUp(response).catch(replyError => {
+                        console.error('[interactionCreate] Follow-up 回覆失敗:', replyError);
+                    });
                 } else {
-                    await interaction.reply(errorResponse).catch(() => null);
+                    await interaction.reply(response).catch(replyError => {
+                        console.error('[interactionCreate] 初始錯誤回覆失敗:', replyError);
+                    });
                 }
             }
+            return;
         }
 
-        // 2. 按鈕互動
         if (interaction.isButton()) {
-            // A. 身份組認證
             if (interaction.customId === 'verify_rules') {
                 try {
                     const config = await GuildConfig.findOne({ guildId: interaction.guildId });
-
-                    if (!config || !config.rulesRoleId) {
-                        return await interaction.reply({ 
-                            content: '❌ 伺服器尚未設定認證身份組，請聯絡管理員喵！', 
-                            flags: [MessageFlags.Ephemeral] 
-                        });
-                    }
-
+                    if (!config || !config.rulesRoleId) return interaction.reply({ content: '❌ 伺服器尚未設定認證身份組，請聯絡管理員喵！', flags: [MessageFlags.Ephemeral] });
                     const role = interaction.guild.roles.cache.get(config.rulesRoleId);
-                    if (!role) {
-                        return await interaction.reply({ 
-                            content: '❌ 找不到設定的身份組，可能已被刪除喵！', 
-                            flags: [MessageFlags.Ephemeral] 
-                        });
-                    }
-
-                    if (interaction.member.roles.cache.has(role.id)) {
-                        return await interaction.reply({ 
-                            content: `喵？你已經擁有 ${role.name} 身份組了喔！`, 
-                            flags: [MessageFlags.Ephemeral] 
-                        });
-                    }
-
+                    if (!role) return interaction.reply({ content: '❌ 找不到設定的身份組，可能已被刪除喵！', flags: [MessageFlags.Ephemeral] });
+                    if (interaction.member.roles.cache.has(role.id)) return interaction.reply({ content: '喵？你已經擁有 ' + role.name + ' 身份組了喔！', flags: [MessageFlags.Ephemeral] });
                     await interaction.member.roles.add(role);
-                    await interaction.reply({ 
-                        content: `✅ 認證成功！你已獲得 **${role.name}** 身份組。`, 
-                        flags: [MessageFlags.Ephemeral] 
-                    });
-
+                    await interaction.reply({ content: '✅ 認證成功！你已獲得 **' + role.name + '** 身份組。', flags: [MessageFlags.Ephemeral] });
                 } catch (error) {
                     console.error('處理規則按鈕出錯:', error);
-                    await interaction.reply({ 
-                        content: '❌ 給予身份組時發生錯誤，請檢查機器人權限階級喵！', 
-                        flags: [MessageFlags.Ephemeral] 
+                    await interaction.reply({ content: '❌ 給予身份組時發生錯誤，請檢查機器人權限階級喵！', flags: [MessageFlags.Ephemeral] }).catch(() => null);
+                }
+                return;
+            }
+
+            if (interaction.customId.startsWith('embed:add:')) {
+                const channelId = interaction.customId.slice('embed:add:'.length);
+                const count = interaction.message?.embeds?.length || 0;
+                if (!count || count >= 10) return interaction.reply({ content: '❌ 找不到有效預覽，或已達 10 張上限。', flags: [MessageFlags.Ephemeral] });
+                return interaction.showModal(addCardModal(channelId, count));
+            }
+
+            if (interaction.customId.startsWith('embed:send:')) {
+                const channelId = interaction.customId.slice('embed:send:'.length);
+                const previewEmbeds = interaction.message?.embeds || [];
+                if (!previewEmbeds.length) return interaction.reply({ content: '❌ 找不到 Embed 預覽，請重新使用 /embed。', flags: [MessageFlags.Ephemeral] });
+
+                await interaction.deferUpdate();
+                try {
+                    const channel = await fetchSendableChannel(interaction.guild, channelId);
+                    const embeds = previewEmbeds.map(item => EmbedBuilder.from(item));
+                    const total = embeds.reduce((sum, embed) => sum + getEmbedTextLength(embed), 0);
+                    if (embeds.length > 10 || total > 6000) throw new Error('卡片數量或文字總長度超過 Discord 限制。');
+                    await channel.send({ embeds });
+                    await interaction.editReply({ content: '✅ 已成功將 ' + embeds.length + ' 張 Embed 卡片發送至 ' + channel + '！', embeds: [], components: [] });
+                } catch (error) {
+                    console.error('發送 Embed 卡片失敗:', error);
+                    await interaction.editReply({
+                        content: '❌ 發送失敗：' + (error.message || '請檢查銀喵的頻道權限。') + '\n預覽內容已保留，你可以修正權限後再試。',
+                        embeds: previewEmbeds,
+                        components: createEmbedControls(channelId, previewEmbeds.length)
                     }).catch(() => null);
                 }
+                return;
             }
+        }
 
-            // B. 追加卡片按鈕 (開啟追加視窗)
-            if (interaction.customId === 'btn_add_embed') {
-                const currentCount = interaction.message.embeds.length;
+        if (interaction.isModalSubmit() && interaction.customId.startsWith('embed:modal:')) {
+            const channelId = interaction.customId.slice('embed:modal:'.length);
+            const existing = (interaction.message?.embeds || []).map(item => EmbedBuilder.from(item));
+            if (!existing.length) return interaction.reply({ content: '❌ 這份 Embed 預覽已失效，請重新使用 /embed。', flags: [MessageFlags.Ephemeral] });
 
-                if (currentCount >= 10) {
-                    return await interaction.reply({
-                        content: '❌ 單次訊息最多只能包含 10 張 Embed 卡片喵！',
-                        flags: [MessageFlags.Ephemeral]
-                    });
-                }
+            try {
+                const added = getEmbedFromModal(interaction.fields, existing.length, interaction);
+                const finalEmbeds = [...existing, added];
+                const total = finalEmbeds.reduce((sum, embed) => sum + getEmbedTextLength(embed), 0);
+                if (finalEmbeds.length > 10) throw new Error('單次訊息最多只能包含 10 張 Embed。');
+                if (total > 6000) throw new Error('所有卡片的文字總長度超過 Discord 的 6000 字元限制。');
 
-                const maxInputs = Math.min(5, 10 - currentCount);
-
-                const addModal = new ModalBuilder()
-                    .setCustomId('modal_add_multi_embed')
-                    .setTitle(`➕ 追加卡片 (目前 ${currentCount}/10 張)`);
-
-                for (let i = 1; i <= maxInputs; i++) {
-                    const cardNum = currentCount + i;
-                    const input = new TextInputBuilder()
-                        .setCustomId(`add_embed_${i}`)
-                        .setLabel(`第 ${cardNum} 張 Embed (選填)`)
-                        .setStyle(TextInputStyle.Paragraph)
-                        .setPlaceholder('📢 標題\n這裡是這張卡片的內文...')
-                        .setRequired(false);
-
-                    addModal.addComponents(new ActionRowBuilder().addComponents(input));
-                }
-
-                await interaction.showModal(addModal);
-            }
-
-            // C. 完成並正式發送到頻道
-            if (interaction.customId === 'btn_finish_embed') {
-                const embedsToSend = interaction.message.embeds;
-
-                // 正式公開發送到該頻道
-                await interaction.channel.send({ embeds: embedsToSend });
-
-                // 更新私密預覽訊息，關閉操作按鈕
                 await interaction.update({
-                    content: '✅ 已成功發送 Embed 卡片到頻道！',
-                    embeds: [],
-                    components: []
-                }).catch(() => null);
+                    content: '✨ **Embed 卡片預覽**\n目前 ' + finalEmbeds.length + '/10 張。可繼續追加卡片，確認外觀後再發送到指定頻道。',
+                    embeds: finalEmbeds,
+                    components: createEmbedControls(channelId, finalEmbeds.length)
+                });
+            } catch (error) {
+                console.error('追加 Embed 卡片失敗:', error);
+                await interaction.reply({ content: '❌ ' + (error.message || '追加卡片時發生錯誤。'), flags: [MessageFlags.Ephemeral] }).catch(() => null);
             }
         }
-
-        // 3. 表單提交
-        if (interaction.isModalSubmit()) {
-            const colors = ['#FFB7C5', '#A855F7', '#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#6366F1', '#EC4899', '#14B8A6', '#8B5CF6'];
-
-            // A. 第一批 1~5 張 Modal 提交
-            if (interaction.customId === 'customEmbedModal') {
-                try {
-                    const embeds = [];
-
-                    for (let i = 1; i <= 5; i++) {
-                        const rawText = interaction.fields.getTextInputValue(`embed_${i}`)?.trim();
-                        if (!rawText) continue;
-
-                        const lines = rawText.split('\n');
-                        const title = lines[0].trim();
-                        const description = lines.slice(1).join('\n').trim();
-
-                        const embed = new EmbedBuilder()
-                            .setTitle(title)
-                            .setColor(colors[embeds.length % colors.length])
-                            .setTimestamp();
-
-                        if (description.length > 0) {
-                            embed.setDescription(description);
-                        }
-
-                        embeds.push(embed);
-                    }
-
-                    if (embeds.length === 0) {
-                        return await interaction.reply({
-                            content: '❌ 請至少填寫一張 Embed 的內容喵！',
-                            flags: [MessageFlags.Ephemeral]
-                        });
-                    }
-
-                    // 加入 flags: [MessageFlags.Ephemeral] 確保只有自己看的到預覽
-                    await interaction.reply({
-                        content: '✨ **[僅你可見的預覽區域]** 請確認預覽內容，可繼續追加卡片，確認無誤後點擊「🚀 發送到頻道」：',
-                        embeds,
-                        components: [createControlButtons(embeds.length)],
-                        flags: [MessageFlags.Ephemeral]
-                    });
-                } catch (error) {
-                    console.error('處理初始 Embed Modal 出錯:', error);
-                }
-            }
-
-            // B. 第二批追加 1~5 張 Modal 提交
-            if (interaction.customId === 'modal_add_multi_embed') {
-                try {
-                    const existingEmbeds = interaction.message.embeds.map(e => EmbedBuilder.from(e));
-                    const newEmbeds = [];
-
-                    for (let i = 1; i <= 5; i++) {
-                        try {
-                            const rawText = interaction.fields.getTextInputValue(`add_embed_${i}`)?.trim();
-                            if (!rawText) continue;
-
-                            const lines = rawText.split('\n');
-                            const title = lines[0].trim();
-                            const description = lines.slice(1).join('\n').trim();
-
-                            const embed = new EmbedBuilder()
-                                .setTitle(title)
-                                .setColor(colors[(existingEmbeds.length + newEmbeds.length) % colors.length])
-                                .setTimestamp();
-
-                            if (description.length > 0) {
-                                embed.setDescription(description);
-                            }
-
-                            newEmbeds.push(embed);
-                        } catch (e) {
-                            break;
-                        }
-                    }
-
-                    if (newEmbeds.length === 0) {
-                        return await interaction.reply({
-                            content: '❌ 你沒有輸入任何追加內容喵！',
-                            flags: [MessageFlags.Ephemeral]
-                        });
-                    }
-
-                    const finalEmbeds = [...existingEmbeds, ...newEmbeds];
-
-                    await interaction.update({
-                        content: '✨ **[僅你可見的預覽區域]** 請確認預覽內容，可繼續追加卡片，確認無誤後點擊「🚀 發送到頻道」：',
-                        embeds: finalEmbeds,
-                        components: [createControlButtons(finalEmbeds.length)]
-                    });
-                } catch (error) {
-                    console.error('追加 Embed 卡片出錯:', error);
-                }
-            }
-        }
-    },
+    }
 };

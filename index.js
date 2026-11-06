@@ -22,7 +22,8 @@ const {
     ButtonBuilder,
     ButtonStyle,
     ChannelType,
-    Events
+    Events,
+    MessageFlags
 } = require('discord.js');
 
 // --- 1. 初始化 Express 與 MongoDB 連線 Promise ---
@@ -721,23 +722,72 @@ function loadAllCommands(baseDir, collection) {
 
 function loadHandlers() {
     const eventsPath = path.join(__dirname, 'events');
-    if (!fs.existsSync(eventsPath)) return;
+    if (!fs.existsSync(eventsPath)) {
+        console.warn('⚠️ 找不到 events 資料夾，沒有載入任何事件。');
+        return;
+    }
 
-    fs.readdirSync(eventsPath).forEach(file => {
-        if (!file.endsWith('.js')) return;
+    const files = fs.readdirSync(eventsPath).filter(file => file.endsWith('.js'));
+    let loadedCount = 0;
+
+    for (const file of files) {
         const eventPath = path.join(eventsPath, file);
 
-        delete require.cache[require.resolve(eventPath)];
-        const event = require(eventPath);
+        try {
+            delete require.cache[require.resolve(eventPath)];
+            const event = require(eventPath);
 
-        if (event.name) {
-            if (event.once) {
-                client.once(event.name, (...args) => event.execute(...args, client));
-            } else {
-                client.on(event.name, (...args) => event.execute(...args, client));
+            if (!event || !event.name || typeof event.execute !== 'function') {
+                console.warn('[事件載入] 略過無效事件檔案：', file);
+                continue;
             }
+
+            // EventEmitter 不會自動處理 async listener 的 Promise rejection，
+            // 因此在這裡統一捕捉，避免事件錯誤變成未處理的 Promise。
+            const listener = (...args) => {
+                Promise.resolve()
+                    .then(() => event.execute(...args, client))
+                    .catch(async error => {
+                        console.error('[事件執行失敗] ' + file + ' (' + event.name + '):', error);
+
+                        // InteractionCreate 若在內部發生未預期錯誤，盡可能向使用者回覆，
+                        // 避免互動畫面一直停留在「正在回應」。
+                        if (event.name !== Events.InteractionCreate) return;
+
+                        const interaction = args[0];
+                        if (!interaction || typeof interaction.isRepliable !== 'function' || !interaction.isRepliable()) return;
+
+                        const response = {
+                            content: '❌ 銀喵處理互動時發生未預期錯誤，請稍後再試。',
+                            flags: [MessageFlags.Ephemeral]
+                        };
+
+                        try {
+                            if (interaction.deferred || interaction.replied) {
+                                await interaction.followUp(response);
+                            } else {
+                                await interaction.reply(response);
+                            }
+                        } catch (replyError) {
+                            console.error('[事件錯誤回覆失敗] ' + file + ':', replyError);
+                        }
+                    });
+            };
+
+            if (event.once) {
+                client.once(event.name, listener);
+            } else {
+                client.on(event.name, listener);
+            }
+
+            loadedCount++;
+            console.log('[事件載入] 已載入：' + file + ' (' + event.name + ')');
+        } catch (error) {
+            console.error('[事件載入失敗] ' + file + ':', error);
         }
-    });
+    }
+
+    console.log('✅ 事件載入完成，共載入 ' + loadedCount + ' 個事件。');
 }
 
 async function startServer() {

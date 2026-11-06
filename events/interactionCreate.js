@@ -13,197 +13,129 @@ const {
 const GuildConfig = require('../models/GuildConfig');
 
 function createEmbedControls(channelId, count) {
-    return [
-        new ActionRowBuilder().addComponents(
-            new ButtonBuilder()
-                .setCustomId('embed:add:' + channelId)
-                .setLabel(count >= 10 ? '已達 10 張上限' : '➕ 追加卡片（還可加 ' + (10 - count) + ' 張）')
-                .setStyle(ButtonStyle.Primary)
-                .setDisabled(count >= 10),
-            new ButtonBuilder()
-                .setCustomId('embed:send:' + channelId)
-                .setLabel('🚀 發送到頻道')
-                .setStyle(ButtonStyle.Success)
-        )
-    ];
+    return [new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+            .setCustomId('embed:add:' + channelId)
+            .setLabel(count >= 10 ? '已達 10 張上限' : '➕ 追加卡片（還可加 ' + (10 - count) + ' 張）')
+            .setStyle(ButtonStyle.Primary)
+            .setDisabled(count >= 10),
+        new ButtonBuilder()
+            .setCustomId('embed:send:' + channelId)
+            .setLabel('🚀 發送到頻道')
+            .setStyle(ButtonStyle.Success)
+    )];
 }
 
-function validateHttpUrl(value, label) {
-    if (value === undefined || value === null || value === '') return undefined;
-    if (typeof value !== 'string') throw new Error(label + '必須是網址字串。');
-
+function validateUrl(value, label) {
+    if (!value) return undefined;
     let parsed;
-    try {
-        parsed = new URL(value.trim());
-    } catch {
-        throw new Error(label + '網址格式不正確。');
-    }
-
-    if (!['http:', 'https:'].includes(parsed.protocol)) {
-        throw new Error(label + '網址必須使用 http:// 或 https://。');
-    }
-
+    try { parsed = new URL(value.trim()); }
+    catch { throw new Error(label + '網址格式不正確。'); }
+    if (!['http:', 'https:'].includes(parsed.protocol)) throw new Error(label + '必須使用 http:// 或 https://。');
     return parsed.href;
 }
 
 function getEmbedTextLength(embed) {
     const data = embed.toJSON();
     const parts = [data.title, data.description, data.author?.name, data.footer?.text];
-
-    for (const field of data.fields || []) {
-        parts.push(field.name, field.value);
-    }
-
+    for (const field of data.fields || []) parts.push(field.name, field.value);
     return parts.reduce((total, value) => total + (typeof value === 'string' ? value.length : 0), 0);
 }
 
-function buildEmbedFromJson(rawText, index) {
-    let data;
-    try {
-        data = JSON.parse(rawText);
-    } catch {
-        throw new Error('JSON 格式錯誤。請使用雙引號，並確認逗號及大括號正確。');
-    }
-
-    if (!data || typeof data !== 'object' || Array.isArray(data)) {
-        throw new Error('Embed 設定必須是一個 JSON 物件。');
-    }
-
+function getEmbedFromModal(fields, index) {
+    const read = id => fields.getTextInputValue(id).trim();
     const embed = new EmbedBuilder();
+    const title = read('card_title');
+    const description = read('card_description');
+    const color = read('card_color');
+    const image = validateUrl(read('card_image'), 'Image');
+    const advanced = read('card_advanced');
 
-    try {
-        if (data.color !== undefined) embed.setColor(data.color);
-
-        if (data.title !== undefined) {
-            if (typeof data.title !== 'string' || data.title.length > 256) {
-                throw new Error('title 最多 256 個字元，而且必須是文字。');
-            }
-            embed.setTitle(data.title);
-        }
-
-        if (data.url !== undefined) {
-            const url = validateHttpUrl(data.url, 'title 的 url');
-            if (url) embed.setURL(url);
-        }
-
-        if (data.author !== undefined) {
-            if (!data.author || typeof data.author !== 'object' || Array.isArray(data.author)) {
-                throw new Error('author 必須是物件。');
-            }
-
-            const author = data.author;
-            if (typeof author.name !== 'string' || !author.name.trim()) {
-                throw new Error('author.name 為必填文字。');
-            }
-            if (author.name.length > 256) throw new Error('author.name 最多 256 個字元。');
-
-            const authorData = { name: author.name };
-            const authorIcon = validateHttpUrl(author.icon_url || author.iconURL, 'author.icon_url');
-            const authorUrl = validateHttpUrl(author.url, 'author.url');
-            if (authorIcon) authorData.iconURL = authorIcon;
-            if (authorUrl) authorData.url = authorUrl;
-            embed.setAuthor(authorData);
-        }
-
-        if (data.description !== undefined) {
-            if (typeof data.description !== 'string' || data.description.length > 4096) {
-                throw new Error('description 最多 4096 個字元，而且必須是文字。');
-            }
-            embed.setDescription(data.description);
-        }
-
-        if (data.thumbnail !== undefined) {
-            if (!data.thumbnail || typeof data.thumbnail !== 'object') {
-                throw new Error('thumbnail 必須是包含 url 的物件。');
-            }
-            const url = validateHttpUrl(data.thumbnail.url, 'thumbnail.url');
-            if (url) embed.setThumbnail(url);
-        }
-
-        if (data.fields !== undefined) {
-            if (!Array.isArray(data.fields) || data.fields.length > 25) {
-                throw new Error('fields 必須是陣列，而且最多 25 個欄位。');
-            }
-
-            const fields = data.fields.map((field, fieldIndex) => {
-                if (!field || typeof field !== 'object' || Array.isArray(field)) {
-                    throw new Error('fields 第 ' + (fieldIndex + 1) + ' 項必須是物件。');
-                }
-                if (typeof field.name !== 'string' || !field.name.length || field.name.length > 256) {
-                    throw new Error('fields 第 ' + (fieldIndex + 1) + ' 項的 name 必須為 1 至 256 個字元。');
-                }
-                if (typeof field.value !== 'string' || !field.value.length || field.value.length > 1024) {
-                    throw new Error('fields 第 ' + (fieldIndex + 1) + ' 項的 value 必須為 1 至 1024 個字元。');
-                }
-                if (field.inline !== undefined && typeof field.inline !== 'boolean') {
-                    throw new Error('fields 第 ' + (fieldIndex + 1) + ' 項的 inline 必須是 true 或 false。');
-                }
-
-                return {
-                    name: field.name,
-                    value: field.value,
-                    inline: field.inline === true
-                };
-            });
-
-            if (fields.length) embed.addFields(fields);
-        }
-
-        if (data.image !== undefined) {
-            if (!data.image || typeof data.image !== 'object') {
-                throw new Error('image 必須是包含 url 的物件。');
-            }
-            const url = validateHttpUrl(data.image.url, 'image.url');
-            if (url) embed.setImage(url);
-        }
-
-        if (data.timestamp !== undefined && data.timestamp !== false && data.timestamp !== null) {
-            if (data.timestamp === true) {
-                embed.setTimestamp();
-            } else {
-                const date = new Date(data.timestamp);
-                if (Number.isNaN(date.getTime())) throw new Error('timestamp 必須是有效日期或 true。');
-                embed.setTimestamp(date);
-            }
-        }
-
-        if (data.footer !== undefined) {
-            if (!data.footer || typeof data.footer !== 'object' || Array.isArray(data.footer)) {
-                throw new Error('footer 必須是物件。');
-            }
-            if (typeof data.footer.text !== 'string' || !data.footer.text.length || data.footer.text.length > 2048) {
-                throw new Error('footer.text 必須為 1 至 2048 個字元。');
-            }
-
-            const footerData = { text: data.footer.text };
-            const footerIcon = validateHttpUrl(data.footer.icon_url || data.footer.iconURL, 'footer.icon_url');
-            if (footerIcon) footerData.iconURL = footerIcon;
-            embed.setFooter(footerData);
-        }
-    } catch (error) {
-        throw new Error('第 ' + (index + 1) + ' 張卡片：' + error.message);
+    if (title) embed.setTitle(title);
+    if (description) embed.setDescription(description);
+    if (color) {
+        if (!/^#[0-9A-F]{6}$/i.test(color)) throw new Error('Color 請使用六位色碼，例如 #0099ff。');
+        embed.setColor(color);
     }
 
-    const built = embed.toJSON();
-    const hasVisibleContent = Boolean(
-        built.title || built.description || built.author || built.thumbnail ||
-        built.image || built.footer || (built.fields && built.fields.length)
-    );
+    const settings = { fields: [] };
+    for (const line of advanced.split(/\r?\n/)) {
+        if (!line.trim()) continue;
+        const splitAt = line.indexOf(':');
+        if (splitAt < 1) throw new Error('進階設定每行請使用「項目: 內容」格式。');
+        const key = line.slice(0, splitAt).trim().toLowerCase();
+        const value = line.slice(splitAt + 1).trim();
 
-    if (!hasVisibleContent) {
-        throw new Error('第 ' + (index + 1) + ' 張卡片沒有可顯示的內容，請至少設定 title、description、author、fields、image、thumbnail 或 footer。');
+        if (key === 'url') settings.url = value;
+        else if (key === 'author') settings.author = value;
+        else if (key === 'author icon') settings.authorIcon = value;
+        else if (key === 'author url') settings.authorUrl = value;
+        else if (key === 'thumbnail') settings.thumbnail = value;
+        else if (key === 'timestamp') settings.timestamp = value.toLowerCase();
+        else if (key === 'footer') settings.footer = value;
+        else if (key === 'footer icon') settings.footerIcon = value;
+        else if (key === 'field') settings.fields.push(value);
+        else throw new Error('不認識的進階設定項目：「' + key + '」。');
     }
 
+    const url = validateUrl(settings.url, 'URL');
+    if (url) embed.setURL(url);
+    if (settings.author) {
+        const author = { name: settings.author };
+        const iconURL = validateUrl(settings.authorIcon, 'Author Icon');
+        const authorURL = validateUrl(settings.authorUrl, 'Author URL');
+        if (iconURL) author.iconURL = iconURL;
+        if (authorURL) author.url = authorURL;
+        embed.setAuthor(author);
+    } else if (settings.authorIcon || settings.authorUrl) {
+        throw new Error('填寫 Author Icon 或 Author URL 時，也必須填寫 Author。');
+    }
+
+    const thumbnail = validateUrl(settings.thumbnail, 'Thumbnail');
+    if (thumbnail) embed.setThumbnail(thumbnail);
+    if (image) embed.setImage(image);
+    if (settings.timestamp === 'true' || settings.timestamp === 'yes') embed.setTimestamp();
+    else if (settings.timestamp && settings.timestamp !== 'false' && settings.timestamp !== 'no') {
+        const date = new Date(settings.timestamp);
+        if (Number.isNaN(date.getTime())) throw new Error('Timestamp 請填 true、false 或有效日期。');
+        embed.setTimestamp(date);
+    }
+
+    if (settings.footer) {
+        const footer = { text: settings.footer };
+        const iconURL = validateUrl(settings.footerIcon, 'Footer Icon');
+        if (iconURL) footer.iconURL = iconURL;
+        embed.setFooter(footer);
+    } else if (settings.footerIcon) {
+        throw new Error('填寫 Footer Icon 時，也必須填寫 Footer。');
+    }
+
+    if (settings.fields.length) {
+        if (settings.fields.length > 25) throw new Error('每張卡片最多 25 個 Fields。');
+        embed.addFields(settings.fields.map((field, fieldIndex) => {
+            const parts = field.split('|').map(part => part.trim());
+            if (parts.length < 2 || !parts[0] || !parts[1]) {
+                throw new Error('Field ' + (fieldIndex + 1) + ' 格式為：名稱 | 內容 | inline。');
+            }
+            const inline = (parts[2] || '').toLowerCase();
+            if (inline && !['true', 'false', 'yes', 'no'].includes(inline)) {
+                throw new Error('Field ' + (fieldIndex + 1) + ' 的 inline 請填 true 或 false。');
+            }
+            return { name: parts[0], value: parts[1], inline: inline === 'true' || inline === 'yes' };
+        }));
+    }
+
+    const data = embed.toJSON();
+    if (![data.title, data.description, data.author, data.thumbnail, data.image, data.footer, ...(data.fields || [])].some(Boolean)) {
+        throw new Error('第 ' + (index + 1) + ' 張卡片沒有可顯示的內容。');
+    }
     return embed;
 }
 
 async function fetchSendableChannel(guild, channelId) {
     if (!guild) throw new Error('無法取得伺服器資料，請重新使用 /embed。');
-
     const channel = await guild.channels.fetch(channelId).catch(() => null);
-    if (!channel || !channel.isTextBased() || channel.guildId !== guild.id) {
-        throw new Error('找不到原本設定的目標文字頻道，請重新使用 /embed。');
-    }
+    if (!channel || !channel.isTextBased() || channel.guildId !== guild.id) throw new Error('找不到原本設定的目標文字頻道。');
 
     const botMember = guild.members.me || await guild.members.fetchMe().catch(() => null);
     const permissions = botMember && channel.permissionsFor(botMember);
@@ -211,171 +143,96 @@ async function fetchSendableChannel(guild, channelId) {
         ? PermissionFlagsBits.SendMessagesInThreads
         : PermissionFlagsBits.SendMessages;
 
-    const requiredPermissions = [
-        PermissionFlagsBits.ViewChannel,
-        sendPermission,
-        PermissionFlagsBits.EmbedLinks
-    ];
-
-    if (!permissions || !permissions.has(requiredPermissions)) {
+    if (!permissions || !permissions.has([PermissionFlagsBits.ViewChannel, sendPermission, PermissionFlagsBits.EmbedLinks])) {
         throw new Error('銀喵缺少查看頻道、發送訊息或嵌入連結權限。');
     }
-
     return channel;
 }
 
 function addCardModal(channelId, currentCount) {
-    const inputCount = Math.min(5, 10 - currentCount);
     const modal = new ModalBuilder()
         .setCustomId('embed:modal:' + channelId)
         .setTitle('追加 Embed 卡片（目前 ' + currentCount + '/10 張）');
 
-    for (let i = 1; i <= inputCount; i++) {
-        const input = new TextInputBuilder()
-            .setCustomId('embed_card_' + i)
-            .setLabel('第 ' + (currentCount + i) + ' 張 Embed JSON')
-            .setStyle(TextInputStyle.Paragraph)
-            .setPlaceholder('{"title":"標題","description":"內容","color":"#0099ff"}')
-            .setMaxLength(4000)
-            .setRequired(false);
+    const inputs = [
+        ['card_title', 'Title（標題）', TextInputStyle.Short, false],
+        ['card_description', 'Description（內文）', TextInputStyle.Paragraph, false],
+        ['card_color', 'Color（例如 #0099ff）', TextInputStyle.Short, false],
+        ['card_image', 'Image URL（大圖網址）', TextInputStyle.Short, false],
+        ['card_advanced', '其他設定（見欄位說明）', TextInputStyle.Paragraph, false]
+    ];
 
+    for (const [id, label, style, required] of inputs) {
+        const input = new TextInputBuilder()
+            .setCustomId(id)
+            .setLabel(label)
+            .setStyle(style)
+            .setRequired(required)
+            .setMaxLength(style === TextInputStyle.Paragraph ? 4000 : 2000);
+        if (id === 'card_advanced') {
+            input.setPlaceholder('Author: 銀喵\nAuthor Icon: https://...\nAuthor URL: https://...\nURL: https://...\nThumbnail: https://...\nTimestamp: true\nFooter: 頁尾文字\nFooter Icon: https://...\nField: 名稱 | 內容 | true');
+        }
         modal.addComponents(new ActionRowBuilder().addComponents(input));
     }
-
     return modal;
-}
-
-async function replyWithPreview(interaction, channelId, embeds) {
-    const totalTextLength = embeds.reduce((total, embed) => total + getEmbedTextLength(embed), 0);
-    if (embeds.length > 10) throw new Error('單次訊息最多只能包含 10 張 Embed。');
-    if (totalTextLength > 6000) throw new Error('所有卡片的文字總長度超過 Discord 的 6000 字元限制。');
-
-    await interaction.reply({
-        content: '✨ **Embed 卡片預覽**\n目前 ' + embeds.length + '/10 張。可追加卡片，確認外觀後再發送到指定頻道。',
-        embeds,
-        components: createEmbedControls(channelId, embeds.length),
-        flags: [MessageFlags.Ephemeral]
-    });
 }
 
 module.exports = {
     name: Events.InteractionCreate,
 
     async execute(interaction, client) {
-        // 1. 斜線指令
         if (interaction.isChatInputCommand()) {
             const command = client.slashCommands.get(interaction.commandName);
             if (!command) return;
-
             try {
                 await command.execute(interaction, client);
             } catch (error) {
                 console.error('執行指令 ' + interaction.commandName + ' 出錯:', error);
                 if (error.code === 10062 || error.code === 10008) return;
-
-                const response = {
-                    content: '❌ 執行指令時出錯，請稍後再試。',
-                    flags: [MessageFlags.Ephemeral]
-                };
-
-                if (interaction.replied || interaction.deferred) {
-                    await interaction.followUp(response).catch(() => null);
-                } else {
-                    await interaction.reply(response).catch(() => null);
-                }
+                const response = { content: '❌ 執行指令時出錯，請稍後再試。', flags: [MessageFlags.Ephemeral] };
+                if (interaction.replied || interaction.deferred) await interaction.followUp(response).catch(() => null);
+                else await interaction.reply(response).catch(() => null);
             }
             return;
         }
 
-        // 2. 按鈕互動
         if (interaction.isButton()) {
-            // A. 身份組認證
             if (interaction.customId === 'verify_rules') {
                 try {
                     const config = await GuildConfig.findOne({ guildId: interaction.guildId });
-
-                    if (!config || !config.rulesRoleId) {
-                        return interaction.reply({
-                            content: '❌ 伺服器尚未設定認證身份組，請聯絡管理員喵！',
-                            flags: [MessageFlags.Ephemeral]
-                        });
-                    }
-
+                    if (!config || !config.rulesRoleId) return interaction.reply({ content: '❌ 伺服器尚未設定認證身份組，請聯絡管理員喵！', flags: [MessageFlags.Ephemeral] });
                     const role = interaction.guild.roles.cache.get(config.rulesRoleId);
-                    if (!role) {
-                        return interaction.reply({
-                            content: '❌ 找不到設定的身份組，可能已被刪除喵！',
-                            flags: [MessageFlags.Ephemeral]
-                        });
-                    }
-
-                    if (interaction.member.roles.cache.has(role.id)) {
-                        return interaction.reply({
-                            content: '喵？你已經擁有 ' + role.name + ' 身份組了喔！',
-                            flags: [MessageFlags.Ephemeral]
-                        });
-                    }
-
+                    if (!role) return interaction.reply({ content: '❌ 找不到設定的身份組，可能已被刪除喵！', flags: [MessageFlags.Ephemeral] });
+                    if (interaction.member.roles.cache.has(role.id)) return interaction.reply({ content: '喵？你已經擁有 ' + role.name + ' 身份組了喔！', flags: [MessageFlags.Ephemeral] });
                     await interaction.member.roles.add(role);
-                    await interaction.reply({
-                        content: '✅ 認證成功！你已獲得 **' + role.name + '** 身份組。',
-                        flags: [MessageFlags.Ephemeral]
-                    });
+                    await interaction.reply({ content: '✅ 認證成功！你已獲得 **' + role.name + '** 身份組。', flags: [MessageFlags.Ephemeral] });
                 } catch (error) {
                     console.error('處理規則按鈕出錯:', error);
-                    await interaction.reply({
-                        content: '❌ 給予身份組時發生錯誤，請檢查機器人權限階級喵！',
-                        flags: [MessageFlags.Ephemeral]
-                    }).catch(() => null);
+                    await interaction.reply({ content: '❌ 給予身份組時發生錯誤，請檢查機器人權限階級喵！', flags: [MessageFlags.Ephemeral] }).catch(() => null);
                 }
                 return;
             }
 
-            // B. 追加卡片
             if (interaction.customId.startsWith('embed:add:')) {
                 const channelId = interaction.customId.slice('embed:add:'.length);
-                const currentCount = interaction.message?.embeds?.length || 0;
-
-                if (!currentCount || currentCount >= 10) {
-                    return interaction.reply({
-                        content: currentCount ? '❌ 單次訊息最多只能包含 10 張 Embed 卡片喵！' : '❌ 找不到 Embed 預覽，請重新使用 /embed。',
-                        flags: [MessageFlags.Ephemeral]
-                    });
-                }
-
-                return interaction.showModal(addCardModal(channelId, currentCount));
+                const count = interaction.message?.embeds?.length || 0;
+                if (!count || count >= 10) return interaction.reply({ content: '❌ 找不到有效預覽，或已達 10 張上限。', flags: [MessageFlags.Ephemeral] });
+                return interaction.showModal(addCardModal(channelId, count));
             }
 
-            // C. 確認並發送
             if (interaction.customId.startsWith('embed:send:')) {
                 const channelId = interaction.customId.slice('embed:send:'.length);
                 const previewEmbeds = interaction.message?.embeds || [];
-
-                if (!previewEmbeds.length) {
-                    return interaction.reply({
-                        content: '❌ 找不到 Embed 預覽，請重新使用 /embed。',
-                        flags: [MessageFlags.Ephemeral]
-                    });
-                }
+                if (!previewEmbeds.length) return interaction.reply({ content: '❌ 找不到 Embed 預覽，請重新使用 /embed。', flags: [MessageFlags.Ephemeral] });
 
                 await interaction.deferUpdate();
-
                 try {
                     const channel = await fetchSendableChannel(interaction.guild, channelId);
                     const embeds = previewEmbeds.map(item => EmbedBuilder.from(item));
-                    const totalTextLength = embeds.reduce((total, embed) => total + getEmbedTextLength(embed), 0);
-
-                    if (embeds.length > 10 || totalTextLength > 6000) {
-                        throw new Error('卡片數量或文字總長度超過 Discord 限制。');
-                    }
-
+                    const total = embeds.reduce((sum, embed) => sum + getEmbedTextLength(embed), 0);
+                    if (embeds.length > 10 || total > 6000) throw new Error('卡片數量或文字總長度超過 Discord 限制。');
                     await channel.send({ embeds });
-
-                    await interaction.editReply({
-                        content: '✅ 已成功將 ' + embeds.length + ' 張 Embed 卡片發送至 ' + channel + '！',
-                        embeds: [],
-                        components: []
-                    });
+                    await interaction.editReply({ content: '✅ 已成功將 ' + embeds.length + ' 張 Embed 卡片發送至 ' + channel + '！', embeds: [], components: [] });
                 } catch (error) {
                     console.error('發送 Embed 卡片失敗:', error);
                     await interaction.editReply({
@@ -388,54 +245,17 @@ module.exports = {
             }
         }
 
-        // 3. 初次建立 Embed 的 Modal 提交
-        if (interaction.isModalSubmit() && interaction.customId.startsWith('embed:create:')) {
-            const channelId = interaction.customId.slice('embed:create:'.length);
-
-            try {
-                const rawJson = interaction.fields.getTextInputValue('embed_json_1').trim();
-                const embed = buildEmbedFromJson(rawJson, 0);
-                await fetchSendableChannel(interaction.guild, channelId);
-                await replyWithPreview(interaction, channelId, [embed]);
-            } catch (error) {
-                console.error('建立 Embed 卡片失敗:', error);
-                await interaction.reply({
-                    content: '❌ ' + (error.message || '建立 Embed 卡片時發生錯誤。') + '\n請檢查 JSON 格式後重新使用 /embed。',
-                    flags: [MessageFlags.Ephemeral]
-                }).catch(() => null);
-            }
-            return;
-        }
-
-        // 4. 追加卡片的 Modal 提交
         if (interaction.isModalSubmit() && interaction.customId.startsWith('embed:modal:')) {
             const channelId = interaction.customId.slice('embed:modal:'.length);
-            const existingEmbeds = (interaction.message?.embeds || []).map(item => EmbedBuilder.from(item));
-
-            if (!existingEmbeds.length) {
-                return interaction.reply({
-                    content: '❌ 這份 Embed 預覽已經失效，請重新使用 /embed。',
-                    flags: [MessageFlags.Ephemeral]
-                });
-            }
+            const existing = (interaction.message?.embeds || []).map(item => EmbedBuilder.from(item));
+            if (!existing.length) return interaction.reply({ content: '❌ 這份 Embed 預覽已失效，請重新使用 /embed。', flags: [MessageFlags.Ephemeral] });
 
             try {
-                const addedEmbeds = [];
-                const inputCount = Math.min(5, 10 - existingEmbeds.length);
-
-                for (let i = 1; i <= inputCount; i++) {
-                    const rawJson = interaction.fields.getTextInputValue('embed_card_' + i).trim();
-                    if (!rawJson) continue;
-                    addedEmbeds.push(buildEmbedFromJson(rawJson, existingEmbeds.length + addedEmbeds.length));
-                }
-
-                if (!addedEmbeds.length) throw new Error('請至少填寫一張新卡片喵！');
-
-                const finalEmbeds = [...existingEmbeds, ...addedEmbeds];
-                const totalTextLength = finalEmbeds.reduce((total, embed) => total + getEmbedTextLength(embed), 0);
-
+                const added = getEmbedFromModal(interaction.fields, existing.length);
+                const finalEmbeds = [...existing, added];
+                const total = finalEmbeds.reduce((sum, embed) => sum + getEmbedTextLength(embed), 0);
                 if (finalEmbeds.length > 10) throw new Error('單次訊息最多只能包含 10 張 Embed。');
-                if (totalTextLength > 6000) throw new Error('所有卡片的文字總長度超過 Discord 的 6000 字元限制，請減少部分文字。');
+                if (total > 6000) throw new Error('所有卡片的文字總長度超過 Discord 的 6000 字元限制。');
 
                 await interaction.update({
                     content: '✨ **Embed 卡片預覽**\n目前 ' + finalEmbeds.length + '/10 張。可繼續追加卡片，確認外觀後再發送到指定頻道。',
@@ -444,10 +264,7 @@ module.exports = {
                 });
             } catch (error) {
                 console.error('追加 Embed 卡片失敗:', error);
-                await interaction.reply({
-                    content: '❌ ' + (error.message || '追加卡片時發生錯誤，請檢查 JSON 設定。'),
-                    flags: [MessageFlags.Ephemeral]
-                }).catch(() => null);
+                await interaction.reply({ content: '❌ ' + (error.message || '追加卡片時發生錯誤。'), flags: [MessageFlags.Ephemeral] }).catch(() => null);
             }
         }
     }

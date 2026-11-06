@@ -10,6 +10,7 @@ const mongoose = require('mongoose');
 const OAuth2 = require('discord-oauth2');
 const cors = require('cors');
 const cron = require('node-cron');
+const { monitorEventLoopDelay, performance } = require('node:perf_hooks');
 const {
     Client,
     Collection,
@@ -36,6 +37,25 @@ const isProduction = process.env.NODE_ENV === 'production';
 const mongooseConnectionPromise = mongoose.connect(process.env.MONGODB_URI);
 
 // --- 2. 初始化 Discord Bot ---
+// 使用單調時鐘監測真正的 Event Loop 延遲，不依賴 Windows 系統時間。
+const eventLoopDelayMonitor = monitorEventLoopDelay({ resolution: 20 });
+eventLoopDelayMonitor.enable();
+
+const eventLoopMonitorTimer = setInterval(() => {
+    const maxMs = eventLoopDelayMonitor.max / 1e6;
+    const p99Ms = eventLoopDelayMonitor.percentile(99) / 1e6;
+
+    if (maxMs >= 500 || p99Ms >= 200) {
+        console.warn(
+            '[EventLoop] 偵測到事件迴圈延遲：p99=' +
+            p99Ms.toFixed(1) + 'ms，max=' + maxMs.toFixed(1) + 'ms（最近 30 秒）'
+        );
+    }
+
+    eventLoopDelayMonitor.reset();
+}, 30000);
+eventLoopMonitorTimer.unref();
+
 const client = new Client({
     intents: [
         GatewayIntentBits.Guilds,
@@ -742,46 +762,60 @@ function loadHandlers() {
                 continue;
             }
 
-            // EventEmitter 不會自動處理 async listener 的 Promise rejection，
-            // 因此在這裡統一捕捉，避免事件錯誤變成未處理的 Promise。
+            // 直接呼叫事件函式，讓 async handler 在 Gateway callback 內立即開始，
+            // 不額外排入 Promise microtask；並量度進入第一個 await 前的同步執行時間。
             const listener = (...args) => {
-                Promise.resolve()
-                    .then(() => event.execute(...args, client))
-                    .catch(async error => {
-                        console.error('[事件執行失敗] ' + file + ' (' + event.name + '):', error);
+                const startedAt = performance.now();
+                let execution;
 
-                        // InteractionCreate 若在內部發生未預期錯誤，盡可能向使用者回覆，
-                        // 避免互動畫面一直停留在「正在回應」。
-                        if (event.name !== Events.InteractionCreate) return;
+                try {
+                    execution = event.execute(...args, client);
+                } catch (error) {
+                    execution = Promise.reject(error);
+                }
 
-                        const interaction = args[0];
-                        if (!interaction || typeof interaction.isRepliable !== 'function' || !interaction.isRepliable()) return;
+                const synchronousDuration = performance.now() - startedAt;
+                if (synchronousDuration >= 100) {
+                    console.warn(
+                        '[事件同步耗時] ' + file + ' (' + event.name + ') 在第一個 await 前執行 ' +
+                        synchronousDuration.toFixed(1) + 'ms。'
+                    );
+                }
 
-                        // Unknown interaction / already acknowledged：不可再送出第二次 callback。
-                        if (
-                            interaction.__yinmiaoAckHandled
-                            || error.code === 10062
-                            || error.code === 40060
-                        ) {
-                            console.warn('[事件錯誤處理] 互動已逾時或已確認，略過重覆回覆。');
-                            return;
+                Promise.resolve(execution).catch(async error => {
+                    console.error('[事件執行失敗] ' + file + ' (' + event.name + '):', error);
+
+                    // InteractionCreate 若在內部發生未預期錯誤，盡可能向使用者回覆。
+                    if (event.name !== Events.InteractionCreate) return;
+
+                    const interaction = args[0];
+                    if (!interaction || typeof interaction.isRepliable !== 'function' || !interaction.isRepliable()) return;
+
+                    // Unknown interaction / already acknowledged：不可再送出第二次 callback。
+                    if (
+                        interaction.__yinmiaoAckHandled
+                        || error.code === 10062
+                        || error.code === 40060
+                    ) {
+                        console.warn('[事件錯誤處理] 互動已逾時或已確認，略過重覆回覆。');
+                        return;
+                    }
+
+                    const response = {
+                        content: '❌ 銀喵處理互動時發生未預期錯誤，請稍後再試。',
+                        flags: [MessageFlags.Ephemeral]
+                    };
+
+                    try {
+                        if (interaction.deferred || interaction.replied) {
+                            await interaction.followUp(response);
+                        } else {
+                            await interaction.reply(response);
                         }
-
-                        const response = {
-                            content: '❌ 銀喵處理互動時發生未預期錯誤，請稍後再試。',
-                            flags: [MessageFlags.Ephemeral]
-                        };
-
-                        try {
-                            if (interaction.deferred || interaction.replied) {
-                                await interaction.followUp(response);
-                            } else {
-                                await interaction.reply(response);
-                            }
-                        } catch (replyError) {
-                            console.error('[事件錯誤回覆失敗] ' + file + ':', replyError);
-                        }
-                    });
+                    } catch (replyError) {
+                        console.error('[事件錯誤回覆失敗] ' + file + ':', replyError);
+                    }
+                });
             };
 
             if (event.once) {

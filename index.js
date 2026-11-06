@@ -756,7 +756,6 @@ function loadHandlers() {
 
             if (!event || !event.name || typeof event.execute !== 'function') {
                 continue;
-                continue;
             }
 
             // 直接呼叫事件函式，讓 async handler 在 Gateway callback 內立即開始，
@@ -774,13 +773,13 @@ function loadHandlers() {
                 const synchronousDuration = performance.now() - startedAt;
                 if (synchronousDuration >= 100) {
                     console.warn(
-                        '[事件同步耗時] ' + file + ' (' + event.name + ') 在第一個 await 前執行 ' +
+                        '[EventHandlerSyncSlow] ' + file + ' (' + event.name + ') 在第一個 await 前執行 ' +
                         synchronousDuration.toFixed(1) + 'ms。'
                     );
                 }
 
                 Promise.resolve(execution).catch(async error => {
-                    console.error('[事件執行失敗] ' + file + ' (' + event.name + '):', error);
+                    console.error('[EventHandlerError] ' + file + ' (' + event.name + '):', error);
 
                     // InteractionCreate 若在內部發生未預期錯誤，盡可能向使用者回覆。
                     if (event.name !== Events.InteractionCreate) return;
@@ -794,7 +793,7 @@ function loadHandlers() {
                         || error.code === 10062
                         || error.code === 40060
                     ) {
-                        console.warn('[事件錯誤處理] 互動已逾時或已確認，略過重覆回覆。');
+                        console.warn('[InteractionFallback] 互動已逾時或已確認，略過重覆回覆。');
                         return;
                     }
 
@@ -810,7 +809,7 @@ function loadHandlers() {
                             await interaction.reply(response);
                         }
                     } catch (replyError) {
-                        console.error('[事件錯誤回覆失敗] ' + file + ':', replyError);
+                        console.error('[InteractionFallbackError] ' + file + ':', replyError);
                     }
                 });
             };
@@ -822,7 +821,7 @@ function loadHandlers() {
             }
 
         } catch (error) {
-            console.error('[事件載入失敗] ' + file + ':', error);
+            console.error('[EventHandlerRequireError] ' + file + ':', error);
         }
     }
 

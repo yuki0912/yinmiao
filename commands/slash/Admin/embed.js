@@ -86,24 +86,9 @@ function buildInitialEmbed(interaction) {
         iconURL: interaction.user.displayAvatarURL({ size: 256 })
     });
 
-    const fields = [];
-    for (let i = 1; i <= 4; i++) {
-        const name = get('field' + i + '_name');
-        const value = get('field' + i + '_value');
-        const inline = interaction.options.getBoolean('field' + i + '_inline');
-
-        if (name || value) {
-            if (!name || !value) throw new Error('Field ' + i + ' 的名稱和內容必須同時填寫。');
-            fields.push({ name, value, inline: inline === true });
-        } else if (inline) {
-            throw new Error('Field ' + i + ' 設定 Inline 前，請先填寫名稱和內容。');
-        }
-    }
-    if (fields.length) embed.addFields(fields);
-
     const data = embed.toJSON();
-    if (![data.title, data.description, data.author, data.thumbnail, data.image, data.footer, ...(data.fields || [])].some(Boolean)) {
-        throw new Error('請至少填寫 Title、Description、Author、Field、Image、Thumbnail 或 Footer 其中一項。');
+    if (![data.title, data.description, data.author, data.thumbnail, data.image].some(Boolean)) {
+        throw new Error('請至少填寫 Title、Description、Author、Image 或 Thumbnail 其中一項。');
     }
 
     return embed;
@@ -129,18 +114,7 @@ module.exports = {
         .addStringOption(option => option.setName('thumbnail').setDescription('Thumbnail：右上角縮圖網址').setMaxLength(2000).setRequired(false))
         .addStringOption(option => option.setName('image').setDescription('Image：卡片底部大圖網址').setMaxLength(2000).setRequired(false))
         .addBooleanOption(option => option.setName('timestamp').setDescription('Timestamp：是否顯示目前時間').setRequired(false))
-        .addStringOption(option => option.setName('field1_name').setDescription('Field 1：欄位名稱').setMaxLength(256).setRequired(false))
-        .addStringOption(option => option.setName('field1_value').setDescription('Field 1：欄位內容').setMaxLength(1024).setRequired(false))
-        .addBooleanOption(option => option.setName('field1_inline').setDescription('Field 1：是否 Inline').setRequired(false))
-        .addStringOption(option => option.setName('field2_name').setDescription('Field 2：欄位名稱').setMaxLength(256).setRequired(false))
-        .addStringOption(option => option.setName('field2_value').setDescription('Field 2：欄位內容').setMaxLength(1024).setRequired(false))
-        .addBooleanOption(option => option.setName('field2_inline').setDescription('Field 2：是否 Inline').setRequired(false))
-        .addStringOption(option => option.setName('field3_name').setDescription('Field 3：欄位名稱').setMaxLength(256).setRequired(false))
-        .addStringOption(option => option.setName('field3_value').setDescription('Field 3：欄位內容').setMaxLength(1024).setRequired(false))
-        .addBooleanOption(option => option.setName('field3_inline').setDescription('Field 3：是否 Inline').setRequired(false))
-        .addStringOption(option => option.setName('field4_name').setDescription('Field 4：欄位名稱').setMaxLength(256).setRequired(false))
-        .addStringOption(option => option.setName('field4_value').setDescription('Field 4：欄位內容').setMaxLength(1024).setRequired(false))
-        .addBooleanOption(option => option.setName('field4_inline').setDescription('Field 4：是否 Inline').setRequired(false)),
+        .addBooleanOption(option => option.setName('timestamp').setDescription('Timestamp：是否顯示目前時間').setRequired(false)),
 
     async execute(interaction) {
         try {
@@ -154,7 +128,6 @@ module.exports = {
             const embed = buildInitialEmbed(interaction);
             const data = embed.toJSON();
             const textParts = [data.title, data.description, data.author?.name, data.footer?.text];
-            for (const field of data.fields || []) textParts.push(field.name, field.value);
             const totalTextLength = textParts.reduce((sum, value) => sum + (typeof value === 'string' ? value.length : 0), 0);
             if (totalTextLength > 6000) throw new Error('Embed 文字總長度超過 Discord 的 6000 字元限制。');
 

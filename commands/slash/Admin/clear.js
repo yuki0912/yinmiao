@@ -1,7 +1,6 @@
 const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
 
 const AUTO_DELETE_DELAY = 5000;
-const HISTORY_SCAN_LIMIT = 1000;
 const BULK_DELETE_AGE = 14 * 24 * 60 * 60 * 1000;
 
 function sleep(ms) {
@@ -37,43 +36,24 @@ async function finishInteraction(interaction, content) {
  * 指定 user 時，會繼續往前找該成員的訊息，不只檢查第一頁。
  */
 async function collectMessages(channel, amount, userId) {
-    const selected = [];
-    let scanned = 0;
-    let before;
+    // 只檢查頻道最新 100 則訊息，不往更早的歷史訊息分頁搜尋。
+    const batch = await channel.messages.fetch({ limit: 100 });
+    const page = [...batch.values()]
+        .sort((a, b) => b.createdTimestamp - a.createdTimestamp);
 
-    while (selected.length < amount && scanned < HISTORY_SCAN_LIMIT) {
-        const limit = Math.min(100, HISTORY_SCAN_LIMIT - scanned);
-        const options = { limit };
-        if (before) options.before = before;
+    const messages = [];
+    for (const message of page) {
+        if (message.pinned) continue;
+        if (userId && message.author.id !== userId) continue;
 
-        const batch = await channel.messages.fetch(options);
-        if (!batch.size) break;
-
-        const page = [...batch.values()]
-            .sort((a, b) => b.createdTimestamp - a.createdTimestamp);
-
-        for (const message of page) {
-            scanned++;
-
-            if (message.pinned) continue;
-            if (userId && message.author.id !== userId) continue;
-
-            selected.push(message);
-            if (selected.length === amount) break;
-        }
-
-        if (selected.length >= amount) break;
-
-        const oldest = page[page.length - 1];
-        if (!oldest || page.length < limit) break;
-
-        before = oldest.id;
+        messages.push(message);
+        if (messages.length >= amount) break;
     }
 
     return {
-        messages: selected,
-        scanned,
-        reachedLimit: scanned >= HISTORY_SCAN_LIMIT && selected.length < amount
+        messages,
+        scanned: page.length,
+        reachedLimit: false
     };
 }
 
@@ -226,13 +206,10 @@ module.exports = {
 
             if (search.messages.length === 0) {
                 let message = targetUser
-                    ? '🔎 最近搜尋的 ' + search.scanned + ' 則訊息中，沒有找到 ' + targetUser.username + ' 可刪除的訊息。'
-                    : '🔎 沒有找到可刪除的訊息。';
+                    ? 'ℹ️ 最新 100 則訊息中，沒有找到 ' + targetUser.username + ' 可刪除的訊息。'
+                    : 'ℹ️ 最新 100 則訊息中，沒有找到可刪除的訊息。';
 
-                message += '（釘選訊息會保留。）';
-                if (search.reachedLimit) {
-                    message += '\n已達最近 ' + HISTORY_SCAN_LIMIT + ' 則訊息的搜尋上限。';
-                }
+                message += '（釘選訊息會保留；不會搜尋更早的歷史訊息。）';
                 message += '\n此提示將於 5 秒後自動刪除。';
 
                 await finishInteraction(interaction, message);
@@ -245,19 +222,18 @@ module.exports = {
 
             const result = await deleteMessages(channel, search.messages);
             const requestedBy = targetUser ? targetUser.username + ' 的 ' : '';
-            let summary = '🧹 已刪除 ' + requestedBy + '**' + result.deleted + '** / **' + search.messages.length + '** 則訊息。';
+            let summary = result.failed === 0
+                ? '✅ **清理成功！**\n🧹 已刪除 ' + requestedBy + '**' + result.deleted + '** / **' + search.messages.length + '** 則訊息。'
+                : '⚠️ **清理部分完成**\n🧹 已刪除 ' + requestedBy + '**' + result.deleted + '** / **' + search.messages.length + '** 則訊息。';
 
             if (search.messages.length < amount) {
-                summary += '\n只找到 ' + search.messages.length + ' 則符合條件的訊息（已搜尋 ' + search.scanned + ' 則）。';
+                summary += '\n最新 100 則訊息中只有 ' + search.messages.length + ' 則符合條件；不會繼續搜尋更早的歷史訊息。';
             }
             if (result.oldCount > 0) {
                 summary += '\n其中 ' + result.oldCount + ' 則超過 14 天，已逐則刪除。';
             }
             if (result.failed > 0) {
                 summary += '\n⚠️ ' + result.failed + ' 則訊息刪除失敗，請檢查 Bot 權限及後台 Log。';
-            }
-            if (search.reachedLimit) {
-                summary += '\n⚠️ 已達 ' + HISTORY_SCAN_LIMIT + ' 則歷史訊息搜尋上限。';
             }
             summary += '\n此提示將於 5 秒後自動刪除。';
 

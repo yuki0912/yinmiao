@@ -757,6 +757,16 @@ function loadHandlers() {
                         const interaction = args[0];
                         if (!interaction || typeof interaction.isRepliable !== 'function' || !interaction.isRepliable()) return;
 
+                        // Unknown interaction / already acknowledged：不可再送出第二次 callback。
+                        if (
+                            interaction.__yinmiaoAckHandled
+                            || error.code === 10062
+                            || error.code === 40060
+                        ) {
+                            console.warn('[事件錯誤處理] 互動已逾時或已確認，略過重覆回覆。');
+                            return;
+                        }
+
                         const response = {
                             content: '❌ 銀喵處理互動時發生未預期錯誤，請稍後再試。',
                             flags: [MessageFlags.Ephemeral]

@@ -194,8 +194,8 @@ module.exports = {
 
             await interaction.editReply({
                 content: targetUser
-                    ? '🔎 正在搜尋 ' + targetUser.username + ' 的訊息喵！'
-                    : '🔎 正在搜尋可刪除的訊息喵！'
+                    ? '🔎 正在搜尋訊息歷史：檢查最近 100 則訊息中的 ' + targetUser.username + ' 訊息喵！'
+                    : '🔎 正在搜尋訊息歷史：檢查頻道最近 100 則訊息喵！'
             });
 
             const search = await collectMessages(
@@ -206,10 +206,10 @@ module.exports = {
 
             if (search.messages.length === 0) {
                 let message = targetUser
-                    ? 'ℹ️ 最新 100 則訊息中，沒有找到 ' + targetUser.username + ' 可刪除的訊息。'
-                    : 'ℹ️ 最新 100 則訊息中，沒有找到可刪除的訊息。';
+                    ? '🔎 **訊息歷史搜尋完成**\n最近 100 則訊息中，沒有找到 ' + targetUser.username + ' 可刪除的訊息。'
+                    : '🔎 **訊息歷史搜尋完成**\n最近 100 則訊息中，沒有找到可刪除的訊息。';
 
-                message += '（釘選訊息會保留；不會搜尋更早的歷史訊息。）';
+                message += '\n📌 釘選訊息會保留；本次只搜尋最近 100 則訊息。';
                 message += '\n此提示將於 5 秒後自動刪除。';
 
                 await finishInteraction(interaction, message);
@@ -217,14 +217,14 @@ module.exports = {
             }
 
             await interaction.editReply({
-                content: '🧹 找到 ' + search.messages.length + ' 則訊息，正在刪除喵！'
+                content: '🔎 **訊息歷史搜尋完成！**\n已檢查最近 ' + search.scanned + ' 則訊息，找到 **' + search.messages.length + '** 則符合條件的訊息。\n🧹 現在開始清理喵！'
             });
 
             const result = await deleteMessages(channel, search.messages);
             const requestedBy = targetUser ? targetUser.username + ' 的 ' : '';
             let summary = result.failed === 0
-                ? '✅ **清理成功！**\n🧹 已刪除 ' + requestedBy + '**' + result.deleted + '** / **' + search.messages.length + '** 則訊息。'
-                : '⚠️ **清理部分完成**\n🧹 已刪除 ' + requestedBy + '**' + result.deleted + '** / **' + search.messages.length + '** 則訊息。';
+                ? '✅ **清理成功！**\n🔎 已完成訊息歷史搜尋：檢查最近 ' + search.scanned + ' 則訊息，找到 ' + search.messages.length + ' 則符合條件。\n🧹 已成功刪除 ' + requestedBy + '**' + result.deleted + '** / **' + search.messages.length + '** 則訊息。'
+                : '⚠️ **清理部分完成**\n🔎 已完成訊息歷史搜尋：檢查最近 ' + search.scanned + ' 則訊息，找到 ' + search.messages.length + ' 則符合條件。\n🧹 已刪除 ' + requestedBy + '**' + result.deleted + '** / **' + search.messages.length + '** 則訊息。';
 
             if (search.messages.length < amount) {
                 summary += '\n最新 100 則訊息中只有 ' + search.messages.length + ' 則符合條件；不會繼續搜尋更早的歷史訊息。';

@@ -3,7 +3,10 @@ const {
     EmbedBuilder,
     PermissionFlagsBits,
     ChannelType,
-    MessageFlags
+    MessageFlags,
+    ActionRowBuilder,
+    ButtonBuilder,
+    ButtonStyle
 } = require('discord.js');
 
 function validateUrl(value, label) {
@@ -155,14 +158,21 @@ module.exports = {
             await checkChannel(interaction.guild, channel);
 
             const embed = buildInitialEmbed(interaction);
-            const { createEmbedControls, getEmbedTextLength } = require('../../../utils/embedBuilder');
-            const totalTextLength = getEmbedTextLength(embed);
+            const data = embed.toJSON();
+            const textParts = [data.title, data.description, data.author?.name, data.footer?.text];
+            for (const field of data.fields || []) textParts.push(field.name, field.value);
+            const totalTextLength = textParts.reduce((sum, value) => sum + (typeof value === 'string' ? value.length : 0), 0);
             if (totalTextLength > 6000) throw new Error('Embed 文字總長度超過 Discord 的 6000 字元限制。');
 
+            const controls = new ActionRowBuilder().addComponents(
+                new ButtonBuilder().setCustomId('embed:add:' + channel.id).setLabel('➕ 追加卡片（還可加 9 張）').setStyle(ButtonStyle.Primary),
+                new ButtonBuilder().setCustomId('embed:send:' + channel.id).setLabel('🚀 發送到頻道').setStyle(ButtonStyle.Success)
+            );
+
             await interaction.reply({
-                content: '✨ **Embed 卡片預覽**\n目前 1/10 張。可追加卡片，確認外觀後再發送到指定頻道。',
+                content: '✨ **Embed 卡片預覽**\\n目前 1/10 張。可追加卡片，確認外觀後再發送到指定頻道。',
                 embeds: [embed],
-                components: [createEmbedControls(channel.id, 1)],
+                components: [controls],
                 flags: [MessageFlags.Ephemeral]
             });
         } catch (error) {

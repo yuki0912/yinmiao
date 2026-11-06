@@ -162,6 +162,12 @@ module.exports = {
         const targetUser = interaction.options.getUser('user');
 
         try {
+            // 立即確認 Discord 互動，並馬上送出可見回覆，避免長時間停留在「正在回應」。
+            await interaction.deferReply();
+            await interaction.editReply({
+                content: '⏳ 已收到清理請求，正在檢查權限喵！'
+            });
+
             if (!interaction.inGuild() || !interaction.guild || !interaction.channel) {
                 throw new Error('此指令只能在伺服器文字頻道中使用。');
             }
@@ -170,9 +176,6 @@ module.exports = {
             if (!channel.messages || typeof channel.messages.fetch !== 'function') {
                 throw new Error('目前頻道不支援讀取訊息。');
             }
-
-            // 先確認互動，避免搜尋歷史訊息時超過 Discord 的回覆期限。
-            await interaction.deferReply();
 
             if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageMessages)) {
                 throw new Error('你需要「管理訊息」權限才能使用此指令。');

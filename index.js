@@ -572,8 +572,8 @@ app.post('/api/save-config', async (req, res) => {
         if (Object.keys(updateData).length === 0) return res.json({ status: 'success', message: '沒有變更。' });
 
         await GuildConfig.findOneAndUpdate(
-            { guildId }, 
-            { $set: updateData,$unset: { voiceGeneratorId: 1, voiceNameTemplate: 1, voiceUserLimit: 1 } }, 
+            { guildId },
+            { $set: updateData, $unset: { voiceGeneratorId: 1, voiceNameTemplate: 1, voiceUserLimit: 1 } },
             { upsert: true, new: true }
         );
 

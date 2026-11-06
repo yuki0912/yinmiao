@@ -1,186 +1,187 @@
 const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
 
 const AUTO_DELETE_DELAY = 5000;
-const MAX_HISTORY_SCAN = 1000;
-const DISCORD_BULK_DELETE_AGE = 14 * 24 * 60 * 60 * 1000;
+const HISTORY_SCAN_LIMIT = 1000;
+const BULK_DELETE_AGE = 14 * 24 * 60 * 60 * 1000;
 
-function delay(ms) {
+function sleep(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 /**
- * 更新原始互動回覆，並在 5 秒後刪除。
- * clear 會先 deferReply，因此進度、結果和錯誤都沿用同一則回覆。
+ * 只編輯已 defer 的原始互動回覆，不會再次呼叫 reply()。
+ * 成功顯示結果後，5 秒再刪除這則回覆。
  */
-async function replyAndAutoDelete(interaction, content) {
-    if (interaction.deferred || interaction.replied) {
+async function finishInteraction(interaction, content) {
+    try {
         await interaction.editReply({ content });
-    } else {
-        await interaction.reply({ content });
+    } catch (error) {
+        console.error('[clear] 更新結果訊息失敗:', error);
+        return;
     }
 
-    await delay(AUTO_DELETE_DELAY);
+    await sleep(AUTO_DELETE_DELAY);
 
     try {
         await interaction.deleteReply();
-        console.log('[clear] 已自動刪除指令回覆。');
+        console.log('[clear] 結果提示已自動刪除。');
     } catch (error) {
-        // 10008 = Unknown Message：訊息已不存在，不需要再處理。
-        if (error.code !== 10008) {
-            console.error('[clear] 自動刪除指令回覆失敗:', error);
+        if (error.code !== 10008 && error.code !== 10015) {
+            console.error('[clear] 自動刪除結果提示失敗:', error);
         }
     }
 }
 
 /**
- * 往頻道較早的訊息分頁搜尋，直到找到 amount 則符合條件的訊息。
- * amount 指的是「符合條件且非釘選」的訊息數，不是搜尋訊息總數。
- * 為避免搜尋整個頻道造成過多 API 請求，最多檢查最近 1,000 則。
+ * 由最新訊息往前分頁搜尋，取得指定數量的非釘選訊息。
+ * 指定 user 時，會繼續往前找該成員的訊息，不只檢查第一頁。
  */
-async function fetchMessagesToClear(channel, amount, targetUserId) {
+async function collectMessages(channel, amount, userId) {
     const selected = [];
-    let scannedCount = 0;
+    let scanned = 0;
     let before;
 
-    while (selected.length < amount && scannedCount < MAX_HISTORY_SCAN) {
-        const limit = Math.min(100, MAX_HISTORY_SCAN - scannedCount);
+    while (selected.length < amount && scanned < HISTORY_SCAN_LIMIT) {
+        const limit = Math.min(100, HISTORY_SCAN_LIMIT - scanned);
         const options = { limit };
         if (before) options.before = before;
 
         const batch = await channel.messages.fetch(options);
-        if (!batch.size) {
-            break;
-        }
+        if (!batch.size) break;
 
-        // 以時間排序，確保分頁游標永遠指向本頁最舊的一則訊息。
-        const page = Array.from(batch.values())
+        const page = [...batch.values()]
             .sort((a, b) => b.createdTimestamp - a.createdTimestamp);
 
         for (const message of page) {
-            scannedCount++;
+            scanned++;
 
             if (message.pinned) continue;
-            if (targetUserId && message.author.id !== targetUserId) continue;
+            if (userId && message.author.id !== userId) continue;
 
             selected.push(message);
-            if (selected.length >= amount) break;
+            if (selected.length === amount) break;
         }
 
         if (selected.length >= amount) break;
 
-        const oldestMessage = page[page.length - 1];
-        if (!oldestMessage || page.length < limit) break;
+        const oldest = page[page.length - 1];
+        if (!oldest || page.length < limit) break;
 
-        before = oldestMessage.id;
+        before = oldest.id;
     }
 
     return {
         messages: selected,
-        scannedCount,
-        scanLimitReached: scannedCount >= MAX_HISTORY_SCAN && selected.length < amount
+        scanned,
+        reachedLimit: scanned >= HISTORY_SCAN_LIMIT && selected.length < amount
     };
 }
 
-async function deleteSelectedMessages(channel, messages) {
-    const cutoff = Date.now() - DISCORD_BULK_DELETE_AGE;
-    const recentMessages = [];
-    const oldMessages = [];
+/**
+ * 刪除訊息：
+ * - 14 天內且至少兩則：批量刪除。
+ * - 單則或超過 14 天：逐則刪除。
+ * - 10008 表示訊息已不存在，視為已達成刪除結果。
+ */
+async function deleteMessages(channel, messages) {
+    const cutoff = Date.now() - BULK_DELETE_AGE;
+    const recent = [];
+    const old = [];
 
     for (const message of messages) {
-        if (message.createdTimestamp > cutoff) recentMessages.push(message);
-        else oldMessages.push(message);
+        if (message.createdTimestamp > cutoff) recent.push(message);
+        else old.push(message);
     }
 
-    let deletedCount = 0;
-    let failedCount = 0;
+    let deleted = 0;
+    let failed = 0;
 
-    const deleteOneByOne = async messageList => {
-        for (const message of messageList) {
+    async function deleteIndividually(list) {
+        for (const message of list) {
             try {
                 await message.delete();
-                deletedCount++;
+                deleted++;
             } catch (error) {
-                failedCount++;
-                console.error('[clear] 單則訊息刪除失敗:', message.id, error);
+                if (error.code === 10008) {
+                    deleted++;
+                } else {
+                    failed++;
+                    console.error('[clear] 刪除單則訊息失敗：' + message.id, error);
+                }
             }
         }
-    };
+    }
 
-    // Discord 批量刪除最多處理 100 則，且不接受超過 14 天的訊息。
-    if (recentMessages.length >= 2 && typeof channel.bulkDelete === 'function') {
+    if (recent.length >= 2 && typeof channel.bulkDelete === 'function') {
         try {
-            const deleted = await channel.bulkDelete(recentMessages, false);
-            deletedCount += deleted.size;
+            const result = await channel.bulkDelete(recent, false);
+            const deletedIds = new Set(result.keys());
+            deleted += deletedIds.size;
 
-            // 批量結果若未包含所有指定訊息，剩餘訊息再逐則嘗試。
-            const deletedIds = new Set(deleted.keys());
-            const remainingMessages = recentMessages.filter(message => !deletedIds.has(message.id));
-            if (remainingMessages.length) {
-                await deleteOneByOne(remainingMessages);
+            const remaining = recent.filter(message => !deletedIds.has(message.id));
+            if (remaining.length) {
+                await deleteIndividually(remaining);
             }
         } catch (error) {
             console.error('[clear] 批量刪除失敗，改為逐則刪除:', error);
-            await deleteOneByOne(recentMessages);
+            await deleteIndividually(recent);
         }
     } else {
-        await deleteOneByOne(recentMessages);
+        await deleteIndividually(recent);
     }
 
-    // 超過 14 天的訊息只能逐則刪除。
-    await deleteOneByOne(oldMessages);
+    await deleteIndividually(old);
 
     return {
-        deletedCount,
-        failedCount,
-        oldMessageCount: oldMessages.length
+        deleted,
+        failed,
+        oldCount: old.length
     };
 }
 
 module.exports = {
     category: 'Admin',
+
     data: new SlashCommandBuilder()
         .setName('clear')
-        .setDescription('清理頻道訊息 (管理員專用)')
-        .addIntegerOption(opt =>
-            opt.setName('amount')
+        .setDescription('清理頻道訊息（管理員專用）')
+        .addIntegerOption(option =>
+            option.setName('amount')
                 .setNameLocalization('zh-TW', '數量')
-                .setDescription('要刪除的訊息數量 (1-100)')
+                .setDescription('要刪除的訊息數量（1-100）')
                 .setRequired(true)
                 .setMinValue(1)
                 .setMaxValue(100)
         )
-        .addUserOption(opt =>
-            opt.setName('user')
+        .addUserOption(option =>
+            option.setName('user')
                 .setNameLocalization('zh-TW', '成員')
-                .setDescription('僅刪除特定成員的訊息 (選填)')
+                .setDescription('只刪除指定成員的訊息（選填）')
                 .setRequired(false)
         )
         .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages),
 
     async execute(interaction) {
-        const amount = interaction.options.getInteger('amount');
-        const targetUser = interaction.options.getUser('user');
+        // 重要：整個指令只在這裡確認一次互動。
+        // deferReply 若失敗，絕不再呼叫 reply()，避免 10062 / 40060 連鎖錯誤。
+        try {
+            await interaction.deferReply();
+        } catch (error) {
+            interaction.__yinmiaoAckHandled = true;
+
+            if (error.code === 10062) {
+                console.error('[clear] Discord 互動已逾時（10062），本次沒有開始刪除訊息。');
+            } else if (error.code === 40060) {
+                console.error('[clear] 互動已被其他處理程序確認（40060），為避免重複清理，本次停止。');
+            } else {
+                console.error('[clear] deferReply 確認互動失敗，本次停止：', error);
+            }
+            return;
+        }
 
         try {
-            // 互動時間戳來自 Discord Snowflake，Date.now() 來自本機系統時鐘；
-            // 兩者可能有時鐘偏差，因此不可用差值中止指令。此處直接確認互動。
-            console.log('[clear] 收到互動：' + interaction.id + '，開始確認 Discord 互動。');
-
-            // deferReply 只能確認一次。10062 代表確認逾時；40060 代表此互動已被其他處理程序確認。
-            try {
-                await interaction.deferReply();
-            } catch (ackError) {
-                if (ackError.code === 10062 || ackError.code === 40060) {
-                    interaction.__yinmiaoAckHandled = true;
-                    console.error(
-                        ackError.code === 10062
-                            ? '[clear] Discord 已判定互動逾時 (10062)，停止重覆回覆。'
-                            : '[clear] 互動已由其他處理程序確認 (40060)，為避免重覆刪除，本次執行已停止。'
-                    );
-                    return;
-                }
-                throw ackError;
-            }
+            const amount = interaction.options.getInteger('amount');
+            const targetUser = interaction.options.getUser('user');
 
             await interaction.editReply({
                 content: '⏳ 已收到清理請求，正在檢查權限喵！'
@@ -191,19 +192,19 @@ module.exports = {
             }
 
             const channel = interaction.channel;
-            if (!channel.messages || typeof channel.messages.fetch !== 'function') {
+            if (!channel.isTextBased?.() || !channel.messages?.fetch) {
                 throw new Error('目前頻道不支援讀取訊息。');
             }
 
             if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageMessages)) {
-                throw new Error('你需要「管理訊息」權限才能使用此指令。');
+                throw new Error('你沒有「管理訊息」權限，無法使用此指令。');
             }
 
             const botMember = interaction.guild.members.me
                 || await interaction.guild.members.fetchMe().catch(() => null);
-            const permissions = botMember && channel.permissionsFor(botMember);
+            const botPermissions = botMember && channel.permissionsFor(botMember);
 
-            if (!permissions || !permissions.has([
+            if (!botPermissions || !botPermissions.has([
                 PermissionFlagsBits.ViewChannel,
                 PermissionFlagsBits.ReadMessageHistory,
                 PermissionFlagsBits.ManageMessages
@@ -213,71 +214,63 @@ module.exports = {
 
             await interaction.editReply({
                 content: targetUser
-                    ? '🔎 正在搜尋 ' + targetUser + ' 的訊息，請稍候喵！'
-                    : '🔎 正在搜尋可清理的訊息，請稍候喵！'
+                    ? '🔎 正在搜尋 ' + targetUser.username + ' 的訊息喵！'
+                    : '🔎 正在搜尋可刪除的訊息喵！'
             });
 
-            const searchResult = await fetchMessagesToClear(
+            const search = await collectMessages(
                 channel,
                 amount,
                 targetUser ? targetUser.id : null
             );
-            const filteredMessages = searchResult.messages;
 
-            if (!filteredMessages.length) {
-                let noMessagesText = targetUser
-                    ? '🔎 已搜尋 ' + searchResult.scannedCount + ' 則訊息，沒有找到成員 ' + targetUser + ' 可刪除的訊息（釘選訊息會保留）。'
-                    : '🔎 已搜尋 ' + searchResult.scannedCount + ' 則訊息，沒有找到可刪除的訊息（釘選訊息會保留）。';
+            if (search.messages.length === 0) {
+                let message = targetUser
+                    ? '🔎 最近搜尋的 ' + search.scanned + ' 則訊息中，沒有找到 ' + targetUser.username + ' 可刪除的訊息。'
+                    : '🔎 沒有找到可刪除的訊息。';
 
-                if (searchResult.scanLimitReached) {
-                    noMessagesText += '\n已達最近 ' + MAX_HISTORY_SCAN + ' 則訊息的搜尋上限。';
+                message += '（釘選訊息會保留。）';
+                if (search.reachedLimit) {
+                    message += '\n已達最近 ' + HISTORY_SCAN_LIMIT + ' 則訊息的搜尋上限。';
                 }
+                message += '\n此提示將於 5 秒後自動刪除。';
 
-                noMessagesText += '\n（此提示將於 5 秒後自動刪除）';
-                await replyAndAutoDelete(interaction, noMessagesText);
+                await finishInteraction(interaction, message);
                 return;
             }
 
             await interaction.editReply({
-                content: '🧹 找到 ' + filteredMessages.length + ' 則符合條件的訊息，正在清理喵！'
+                content: '🧹 找到 ' + search.messages.length + ' 則訊息，正在刪除喵！'
             });
 
-            const result = await deleteSelectedMessages(channel, filteredMessages);
-            const targetText = targetUser ? '成員 ' + targetUser + ' 的 ' : '';
-            let replyText = '🧹 已成功刪除 ' + targetText + '**' + result.deletedCount + '** / **' + filteredMessages.length + '** 則訊息。';
+            const result = await deleteMessages(channel, search.messages);
+            const requestedBy = targetUser ? targetUser.username + ' 的 ' : '';
+            let summary = '🧹 已刪除 ' + requestedBy + '**' + result.deleted + '** / **' + search.messages.length + '** 則訊息。';
 
-            if (filteredMessages.length < amount) {
-                replyText += '\n只找到 ' + filteredMessages.length + ' 則符合條件的訊息，已搜尋 ' + searchResult.scannedCount + ' 則歷史訊息。';
+            if (search.messages.length < amount) {
+                summary += '\n只找到 ' + search.messages.length + ' 則符合條件的訊息（已搜尋 ' + search.scanned + ' 則）。';
             }
-            if (result.oldMessageCount > 0) {
-                replyText += '\n其中 ' + result.oldMessageCount + ' 則超過 14 天，已改為逐則刪除。';
+            if (result.oldCount > 0) {
+                summary += '\n其中 ' + result.oldCount + ' 則超過 14 天，已逐則刪除。';
             }
-            if (result.failedCount > 0) {
-                replyText += '\n⚠️ 另有 ' + result.failedCount + ' 則訊息刪除失敗，請檢查後台 Log 及 Bot 權限。';
+            if (result.failed > 0) {
+                summary += '\n⚠️ ' + result.failed + ' 則訊息刪除失敗，請檢查 Bot 權限及後台 Log。';
             }
-            if (searchResult.scanLimitReached) {
-                replyText += '\n⚠️ 已達最近 ' + MAX_HISTORY_SCAN + ' 則訊息的搜尋上限，未必涵蓋更早的訊息。';
+            if (search.reachedLimit) {
+                summary += '\n⚠️ 已達 ' + HISTORY_SCAN_LIMIT + ' 則歷史訊息搜尋上限。';
             }
-            replyText += '\n（此提示將於 5 秒後自動刪除）';
+            summary += '\n此提示將於 5 秒後自動刪除。';
 
-            await replyAndAutoDelete(interaction, replyText);
+            await finishInteraction(interaction, summary);
         } catch (error) {
-            console.error('[clear] 清理訊息時發生錯誤:', error);
+            console.error('[clear] 指令執行失敗:', error);
 
-            // 這兩種錯誤代表互動已逾時或已被確認，不能再呼叫 reply()。
-            if (error.code === 10062 || error.code === 40060) {
-                interaction.__yinmiaoAckHandled = true;
-                console.warn('[clear] 已停止二次回覆，互動狀態碼：' + error.code);
-                return;
-            }
+            const message = error.code === 50013
+                ? '❌ 銀喵缺少必要權限，請確認頻道權限設定。'
+                : '❌ 清理訊息失敗：' + (error.message || '未知錯誤。');
 
-            const errorMessage = error.code === 50013
-                ? '❌ 銀喵缺少必要權限，請確認已授予「管理訊息」及相關頻道權限。'
-                : '❌ 清理訊息失敗：' + (error.message || '請檢查頻道權限或訊息狀態。');
-
-            await replyAndAutoDelete(interaction, errorMessage).catch(replyError => {
-                console.error('[clear] 無法發送錯誤提示:', replyError);
-            });
+            // deferReply 已成功，錯誤處理只准 editReply，不可再次 reply。
+            await finishInteraction(interaction, message);
         }
     }
 };

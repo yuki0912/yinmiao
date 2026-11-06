@@ -144,8 +144,11 @@ module.exports = {
                 return;
             }
 
-            // 在開始刪除前先確認互動，避免逐則刪除舊訊息時超過 Discord 回覆時限。
+            // 先確認互動並立即顯示清理進度，不再讓 Discord 一直顯示「銀喵正在回應…」。
             await interaction.deferReply();
+            await interaction.editReply({
+                content: `🧹 正在清理 ${filteredMessages.size} 則訊息，請稍候喵！\\n超過 14 天的訊息會逐則刪除。`
+            });
 
             const result = await deleteSelectedMessages(channel, filteredMessages);
             const targetText = targetUser ? `成員 ${targetUser} 的 ` : '';

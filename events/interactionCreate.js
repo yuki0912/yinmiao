@@ -46,7 +46,6 @@ function applyUserFooter(embed, interaction) {
 function getEmbedTextLength(embed) {
     const data = embed.toJSON();
     const parts = [data.title, data.description, data.author?.name, data.footer?.text];
-    for (const field of data.fields || []) parts.push(field.name, field.value);
     return parts.reduce((total, value) => total + (typeof value === 'string' ? value.length : 0), 0);
 }
 
@@ -66,7 +65,7 @@ function getEmbedFromModal(fields, index, interaction) {
         embed.setColor(color);
     }
 
-    const settings = { fields: [] };
+    const settings = {};
     for (const line of advanced.split(/\r?\n/)) {
         if (!line.trim()) continue;
         const splitAt = line.indexOf(':');
@@ -83,7 +82,6 @@ function getEmbedFromModal(fields, index, interaction) {
         else if (key === 'footer' || key === 'footer icon') {
             throw new Error('Footer 已自動顯示執行指令的使用者名稱和頭像，請移除 Footer 設定。');
         }
-        else if (key === 'field') settings.fields.push(value);
         else throw new Error('不認識的進階設定項目：「' + key + '」。');
     }
 
@@ -110,25 +108,10 @@ function getEmbedFromModal(fields, index, interaction) {
         embed.setTimestamp(date);
     }
 
-    if (settings.fields.length) {
-        if (settings.fields.length > 25) throw new Error('每張卡片最多 25 個 Fields。');
-        embed.addFields(settings.fields.map((field, fieldIndex) => {
-            const parts = field.split('|').map(part => part.trim());
-            if (parts.length < 2 || !parts[0] || !parts[1]) {
-                throw new Error('Field ' + (fieldIndex + 1) + ' 格式為：名稱 | 內容 | inline。');
-            }
-            const inline = (parts[2] || '').toLowerCase();
-            if (inline && !['true', 'false', 'yes', 'no'].includes(inline)) {
-                throw new Error('Field ' + (fieldIndex + 1) + ' 的 inline 請填 true 或 false。');
-            }
-            return { name: parts[0], value: parts[1], inline: inline === 'true' || inline === 'yes' };
-        }));
-    }
-
     applyUserFooter(embed, interaction);
 
     const data = embed.toJSON();
-    if (![data.title, data.description, data.author, data.thumbnail, data.image, data.footer, ...(data.fields || [])].some(Boolean)) {
+    if (![data.title, data.description, data.author, data.thumbnail, data.image].some(Boolean)) {
         throw new Error('第 ' + (index + 1) + ' 張卡片沒有可顯示的內容。');
     }
     return embed;
@@ -172,7 +155,7 @@ function addCardModal(channelId, currentCount) {
             .setRequired(required)
             .setMaxLength(style === TextInputStyle.Paragraph ? 4000 : 2000);
         if (id === 'card_advanced') {
-            input.setPlaceholder('Author: 銀喵\\nThumbnail: https://...\\nTimestamp: true\\nField: 名稱 | 內容 | true\\nFooter 自動顯示你的名稱和頭像');
+            input.setPlaceholder('Author: 銀喵\\nThumbnail: https://...\\nTimestamp: true\\nFooter 自動顯示你的名稱和頭像');
         }
         modal.addComponents(new ActionRowBuilder().addComponents(input));
     }

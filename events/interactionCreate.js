@@ -168,15 +168,49 @@ module.exports = {
     async execute(interaction, client) {
         if (interaction.isChatInputCommand()) {
             const command = client.slashCommands.get(interaction.commandName);
-            if (!command) return;
+
+            // 指令已在 Discord 註冊，但本機沒有載入時，也必須回覆互動，不能直接 return。
+            if (!command) {
+                console.error('[interactionCreate] 找不到 Slash Command：', interaction.commandName);
+                await interaction.reply({
+                    content: '❌ 找不到這個指令的執行檔，請通知管理員檢查 Bot 指令載入狀態。',
+                    flags: [MessageFlags.Ephemeral]
+                }).catch(error => console.error('[interactionCreate] 回覆未知指令失敗:', error));
+                return;
+            }
+
             try {
                 await command.execute(interaction, client);
+
+                // 防止指令執行完畢卻沒有 reply/defer，讓 Discord 永遠停留在「正在回應」。
+                if (!interaction.replied && !interaction.deferred) {
+                    console.warn('[interactionCreate] 指令未回覆互動：', interaction.commandName);
+                    await interaction.reply({
+                        content: '⚠️ 指令已執行，但沒有提供互動回覆。請通知管理員檢查此指令。',
+                        flags: [MessageFlags.Ephemeral]
+                    }).catch(error => console.error('[interactionCreate] 補發互動回覆失敗:', error));
+                }
             } catch (error) {
                 console.error('執行指令 ' + interaction.commandName + ' 出錯:', error);
-                if (error.code === 10062 || error.code === 10008) return;
-                const response = { content: '❌ 執行指令時出錯，請稍後再試。', flags: [MessageFlags.Ephemeral] };
-                if (interaction.replied || interaction.deferred) await interaction.followUp(response).catch(() => null);
-                else await interaction.reply(response).catch(() => null);
+                if (error.code === 10062) {
+                    console.warn('[interactionCreate] 互動已逾時，無法再回覆：', interaction.commandName);
+                    return;
+                }
+
+                const response = {
+                    content: '❌ 執行指令時出錯，請稍後再試。',
+                    flags: [MessageFlags.Ephemeral]
+                };
+
+                if (interaction.replied || interaction.deferred) {
+                    await interaction.followUp(response).catch(replyError => {
+                        console.error('[interactionCreate] Follow-up 回覆失敗:', replyError);
+                    });
+                } else {
+                    await interaction.reply(response).catch(replyError => {
+                        console.error('[interactionCreate] 初始錯誤回覆失敗:', replyError);
+                    });
+                }
             }
             return;
         }

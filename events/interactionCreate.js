@@ -170,7 +170,7 @@ function addCardModal(channelId, currentCount) {
             .setRequired(required)
             .setMaxLength(style === TextInputStyle.Paragraph ? 4000 : 2000);
         if (id === 'card_advanced') {
-            input.setPlaceholder('Author: 銀喵\nAuthor Icon: https://...\nAuthor URL: https://...\nURL: https://...\nThumbnail: https://...\nTimestamp: true\nFooter: 頁尾文字\nFooter Icon: https://...\nField: 名稱 | 內容 | true');
+            input.setPlaceholder('Author: 銀喵\nThumbnail: https://...\nTimestamp: true\nFooter: 文字\nField: 名稱 | 內容 | true');
         }
         modal.addComponents(new ActionRowBuilder().addComponents(input));
     }

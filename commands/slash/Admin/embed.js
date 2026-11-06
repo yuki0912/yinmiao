@@ -113,6 +113,17 @@ module.exports = {
             if (imageUrl || attachment) embed.setImage(imageUrl || attachment.url);
             if (thumbnail) embed.setThumbnail(thumbnail);
 
+            const embedData = embed.toJSON();
+            const totalTextLength = [
+                embedData.title,
+                embedData.description,
+                embedData.author?.name,
+                embedData.footer?.text
+            ].reduce((total, value) => total + (typeof value === 'string' ? value.length : 0), 0);
+            if (totalTextLength > 6000) {
+                throw new Error('卡片文字總長度超過 Discord 的 6000 字元限制，請縮短內文或頁尾。');
+            }
+
             await interaction.reply({
                 content: '✨ **Embed 卡片預覽**\n目前 1/10 張。可追加卡片，確認後再發送到指定頻道。',
                 embeds: [embed],

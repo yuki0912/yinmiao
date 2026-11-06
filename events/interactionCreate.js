@@ -122,9 +122,12 @@ async function fetchSendableChannel(guild, channelId) {
 
     const me = guild.members.me || await guild.members.fetchMe().catch(() => null);
     const permissions = me && channel.permissionsFor(me);
+    const sendPermission = typeof channel.isThread === 'function' && channel.isThread()
+        ? PermissionFlagsBits.SendMessagesInThreads
+        : PermissionFlagsBits.SendMessages;
     const required = [
         PermissionFlagsBits.ViewChannel,
-        PermissionFlagsBits.SendMessages,
+        sendPermission,
         PermissionFlagsBits.EmbedLinks
     ];
 

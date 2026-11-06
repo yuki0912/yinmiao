@@ -162,8 +162,33 @@ module.exports = {
         const targetUser = interaction.options.getUser('user');
 
         try {
-            // 立即確認 Discord 互動，並馬上送出可見回覆，避免長時間停留在「正在回應」。
-            await interaction.deferReply();
+            // 記錄互動從建立到進入指令的延遲，協助判斷事件迴圈阻塞或多個 Bot 程序競爭。
+            const interactionAgeMs = Date.now() - interaction.createdTimestamp;
+            console.log('[clear] 收到互動：' + interaction.id + '，進入指令時延遲 ' + interactionAgeMs + 'ms。');
+
+            // 超過 2.5 秒就不要再送出容易逾時的確認請求，並阻止事件層重覆嘗試 reply。
+            if (interactionAgeMs > 2500) {
+                interaction.__yinmiaoAckHandled = true;
+                console.error('[clear] 互動抵達指令時已接近／超過 Discord 3 秒確認期限。請檢查 Node.js event loop 或是否同時啟動多個 Bot 程序。');
+                return;
+            }
+
+            // deferReply 只能確認一次。10062 代表確認逾時；40060 代表此互動已被其他處理程序確認。
+            try {
+                await interaction.deferReply();
+            } catch (ackError) {
+                if (ackError.code === 10062 || ackError.code === 40060) {
+                    interaction.__yinmiaoAckHandled = true;
+                    console.error(
+                        ackError.code === 10062
+                            ? '[clear] Discord 已判定互動逾時 (10062)，停止重覆回覆。'
+                            : '[clear] 互動已由其他處理程序確認 (40060)，為避免重覆刪除，本次執行已停止。'
+                    );
+                    return;
+                }
+                throw ackError;
+            }
+
             await interaction.editReply({
                 content: '⏳ 已收到清理請求，正在檢查權限喵！'
             });
@@ -245,6 +270,13 @@ module.exports = {
             await replyAndAutoDelete(interaction, replyText);
         } catch (error) {
             console.error('[clear] 清理訊息時發生錯誤:', error);
+
+            // 這兩種錯誤代表互動已逾時或已被確認，不能再呼叫 reply()。
+            if (error.code === 10062 || error.code === 40060) {
+                interaction.__yinmiaoAckHandled = true;
+                console.warn('[clear] 已停止二次回覆，互動狀態碼：' + error.code);
+                return;
+            }
 
             const errorMessage = error.code === 50013
                 ? '❌ 銀喵缺少必要權限，請確認已授予「管理訊息」及相關頻道權限。'

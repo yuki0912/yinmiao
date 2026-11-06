@@ -35,6 +35,14 @@ function validateUrl(value, label) {
     return parsed.href;
 }
 
+function applyUserFooter(embed, interaction) {
+    const displayName = interaction.member?.displayName || interaction.user.globalName || interaction.user.username;
+    embed.setFooter({
+        text: displayName,
+        iconURL: interaction.user.displayAvatarURL({ size: 256 })
+    });
+}
+
 function getEmbedTextLength(embed) {
     const data = embed.toJSON();
     const parts = [data.title, data.description, data.author?.name, data.footer?.text];
@@ -42,7 +50,7 @@ function getEmbedTextLength(embed) {
     return parts.reduce((total, value) => total + (typeof value === 'string' ? value.length : 0), 0);
 }
 
-function getEmbedFromModal(fields, index) {
+function getEmbedFromModal(fields, index, interaction) {
     const read = id => fields.getTextInputValue(id).trim();
     const embed = new EmbedBuilder();
     const title = read('card_title');
@@ -72,8 +80,9 @@ function getEmbedFromModal(fields, index) {
         else if (key === 'author url') settings.authorUrl = value;
         else if (key === 'thumbnail') settings.thumbnail = value;
         else if (key === 'timestamp') settings.timestamp = value.toLowerCase();
-        else if (key === 'footer') settings.footer = value;
-        else if (key === 'footer icon') settings.footerIcon = value;
+        else if (key === 'footer' || key === 'footer icon') {
+            throw new Error('Footer 已自動顯示執行指令的使用者名稱和頭像，請移除 Footer 設定。');
+        }
         else if (key === 'field') settings.fields.push(value);
         else throw new Error('不認識的進階設定項目：「' + key + '」。');
     }
@@ -101,15 +110,6 @@ function getEmbedFromModal(fields, index) {
         embed.setTimestamp(date);
     }
 
-    if (settings.footer) {
-        const footer = { text: settings.footer };
-        const iconURL = validateUrl(settings.footerIcon, 'Footer Icon');
-        if (iconURL) footer.iconURL = iconURL;
-        embed.setFooter(footer);
-    } else if (settings.footerIcon) {
-        throw new Error('填寫 Footer Icon 時，也必須填寫 Footer。');
-    }
-
     if (settings.fields.length) {
         if (settings.fields.length > 25) throw new Error('每張卡片最多 25 個 Fields。');
         embed.addFields(settings.fields.map((field, fieldIndex) => {
@@ -124,6 +124,8 @@ function getEmbedFromModal(fields, index) {
             return { name: parts[0], value: parts[1], inline: inline === 'true' || inline === 'yes' };
         }));
     }
+
+    applyUserFooter(embed, interaction);
 
     const data = embed.toJSON();
     if (![data.title, data.description, data.author, data.thumbnail, data.image, data.footer, ...(data.fields || [])].some(Boolean)) {
@@ -170,7 +172,7 @@ function addCardModal(channelId, currentCount) {
             .setRequired(required)
             .setMaxLength(style === TextInputStyle.Paragraph ? 4000 : 2000);
         if (id === 'card_advanced') {
-            input.setPlaceholder('Author: 銀喵\nThumbnail: https://...\nTimestamp: true\nFooter: 文字\nField: 名稱 | 內容 | true');
+            input.setPlaceholder('Author: 銀喵\\nThumbnail: https://...\\nTimestamp: true\\nField: 名稱 | 內容 | true\\nFooter 自動顯示你的名稱和頭像');
         }
         modal.addComponents(new ActionRowBuilder().addComponents(input));
     }
@@ -251,7 +253,7 @@ module.exports = {
             if (!existing.length) return interaction.reply({ content: '❌ 這份 Embed 預覽已失效，請重新使用 /embed。', flags: [MessageFlags.Ephemeral] });
 
             try {
-                const added = getEmbedFromModal(interaction.fields, existing.length);
+                const added = getEmbedFromModal(interaction.fields, existing.length, interaction);
                 const finalEmbeds = [...existing, added];
                 const total = finalEmbeds.reduce((sum, embed) => sum + getEmbedTextLength(embed), 0);
                 if (finalEmbeds.length > 10) throw new Error('單次訊息最多只能包含 10 張 Embed。');

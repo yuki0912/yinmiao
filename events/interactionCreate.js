@@ -183,7 +183,7 @@ module.exports = {
                 await command.execute(interaction, client);
 
                 // 防止指令執行完畢卻沒有 reply/defer，讓 Discord 永遠停留在「正在回應」。
-                if (!interaction.replied && !interaction.deferred) {
+                if (!interaction.replied && !interaction.deferred && !interaction.__yinmiaoAckHandled) {
                     console.warn('[interactionCreate] 指令未回覆互動：', interaction.commandName);
                     await interaction.reply({
                         content: '⚠️ 指令已執行，但沒有提供互動回覆。請通知管理員檢查此指令。',
@@ -192,8 +192,12 @@ module.exports = {
                 }
             } catch (error) {
                 console.error('執行指令 ' + interaction.commandName + ' 出錯:', error);
-                if (error.code === 10062) {
-                    console.warn('[interactionCreate] 互動已逾時，無法再回覆：', interaction.commandName);
+                if (error.code === 10062 || error.code === 40060 || interaction.__yinmiaoAckHandled) {
+                    console.warn(
+                        '[interactionCreate] 互動已逾時或已由其他處理程序確認，停止二次回覆：',
+                        interaction.commandName,
+                        'code=' + (error.code || 'ack-handled')
+                    );
                     return;
                 }
 

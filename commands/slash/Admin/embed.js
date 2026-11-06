@@ -1,102 +1,129 @@
-const { 
-    SlashCommandBuilder, 
-    EmbedBuilder, 
+const {
+    SlashCommandBuilder,
+    EmbedBuilder,
     PermissionFlagsBits,
     ChannelType,
-    MessageFlags
+    MessageFlags,
+    ActionRowBuilder,
+    ButtonBuilder,
+    ButtonStyle
 } = require('discord.js');
+
+function validateUrl(value, label) {
+    if (!value) return null;
+    let parsed;
+    try {
+        parsed = new URL(value.trim());
+    } catch {
+        throw new Error(label + '網址格式不正確。');
+    }
+    if (!['http:', 'https:'].includes(parsed.protocol)) {
+        throw new Error(label + '網址必須使用 http:// 或 https://。');
+    }
+    return parsed.href;
+}
+
+function createControls(channelId) {
+    return new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+            .setCustomId('embed:add:' + channelId)
+            .setLabel('➕ 追加卡片')
+            .setStyle(ButtonStyle.Primary),
+        new ButtonBuilder()
+            .setCustomId('embed:send:' + channelId)
+            .setLabel('🚀 發送到頻道')
+            .setStyle(ButtonStyle.Success)
+    );
+}
+
+async function checkChannel(guild, channel) {
+    if (!channel || !channel.isTextBased() || channel.guildId !== guild.id) {
+        throw new Error('找不到有效的伺服器文字頻道。');
+    }
+    const me = guild.members.me || await guild.members.fetchMe().catch(() => null);
+    const permissions = me && channel.permissionsFor(me);
+    const required = [
+        PermissionFlagsBits.ViewChannel,
+        PermissionFlagsBits.SendMessages,
+        PermissionFlagsBits.EmbedLinks
+    ];
+    if (!permissions || !permissions.has(required)) {
+        throw new Error('銀喵缺少查看頻道、發送訊息或嵌入連結權限。');
+    }
+}
 
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('embed')
-        .setDescription('發送一張標準的 Embed 內嵌卡片')
+        .setDescription('建立多張 Embed 卡片，預覽後再發送')
         .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages)
-        .addStringOption(opt =>
-            opt.setName('title')
-               .setDescription('卡片標題')
-               .setRequired(true)
-        )
-        .addStringOption(opt =>
-            opt.setName('description')
-               .setDescription('內文描述（支援 \\n 換行與 Markdown 語法）')
-               .setRequired(true)
-        )
-        .addChannelOption(opt =>
-            opt.setName('channel')
-               .setDescription('要發送的頻道（未填則發送至當前頻道）')
-               .addChannelTypes(ChannelType.GuildText)
-               .setRequired(false)
-        )
-        .addStringOption(opt =>
-            opt.setName('color')
-               .setDescription('色碼（例如: #FFC8DD，預設為暗色系）')
-               .setRequired(false)
-        )
-        .addStringOption(opt =>
-            opt.setName('url')
-               .setDescription('點擊標題可跳轉的網址（需包含 http:// 或 https://）')
-               .setRequired(false)
-        )
-        .addAttachmentOption(opt =>
-            opt.setName('image')
-               .setDescription('附加大圖')
-               .setRequired(false)
-        ),
+        .addStringOption(opt => opt.setName('title').setDescription('第一張卡片標題').setMaxLength(256).setRequired(true))
+        .addStringOption(opt => opt.setName('description').setDescription('第一張卡片內文').setMaxLength(4096).setRequired(true))
+        .addChannelOption(opt => opt.setName('channel').setDescription('目標頻道（未填則使用目前頻道）').addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement).setRequired(false))
+        .addStringOption(opt => opt.setName('color').setDescription('卡片顏色，例如 #F43F5E').setMaxLength(7).setRequired(false))
+        .addStringOption(opt => opt.setName('url').setDescription('點擊標題後開啟的網址').setMaxLength(2000).setRequired(false))
+        .addAttachmentOption(opt => opt.setName('image').setDescription('上傳卡片大圖（只接受圖片）').setRequired(false))
+        .addStringOption(opt => opt.setName('image_url').setDescription('卡片大圖網址').setMaxLength(2000).setRequired(false))
+        .addStringOption(opt => opt.setName('thumbnail').setDescription('卡片縮圖網址').setMaxLength(2000).setRequired(false))
+        .addStringOption(opt => opt.setName('footer').setDescription('卡片頁尾文字').setMaxLength(2048).setRequired(false)),
 
     async execute(interaction) {
-        // 先延遲回應，防止發送過程超過 3 秒導致指令逾時
-        await interaction.deferReply({ flags: [MessageFlags.Ephemeral] });
-
-        const title = interaction.options.getString('title');
-        const description = interaction.options.getString('description').replace(/\\n/g, '\n');
-        const targetChannel = interaction.options.getChannel('channel') || interaction.channel;
-        const rawColor = interaction.options.getString('color');
-        const url = interaction.options.getString('url');
-        const image = interaction.options.getAttachment('image');
-
-        // 色碼格式驗證
-        const embedColor = (rawColor && /^#[0-9A-F]{6}$/i.test(rawColor)) ? rawColor : '#2F3136';
-
-        // 建立 Embed 卡片
-        const embed = new EmbedBuilder()
-            .setAuthor({ 
-                name: interaction.guild.name, 
-                iconURL: interaction.guild.iconURL() || undefined 
-            })
-            .setTitle(title)
-            .setDescription(description)
-            .setColor(embedColor)
-            .setTimestamp()
-            .setFooter({ 
-                text: `發送者：${interaction.user.tag}`, 
-                iconURL: interaction.user.displayAvatarURL() 
-            });
-
-        // URL 格式驗證（防範未帶 http/https 導致 Discord API 報錯）
-        if (url) {
-            try {
-                const parsedUrl = new URL(url);
-                if (['http:', 'https:'].includes(parsedUrl.protocol)) {
-                    embed.setURL(parsedUrl.href);
-                } else {
-                    return interaction.editReply('⚠️ 網址必須以 `http://` 或 `https://` 開頭喵！');
-                }
-            } catch (e) {
-                return interaction.editReply('⚠️ 提供的網址格式不正確，請檢查後重試喵！');
-            }
-        }
-
-        if (image) {
-            embed.setImage(image.url);
-        }
-
-        // 發送訊息與權限捕獲
         try {
-            await targetChannel.send({ embeds: [embed] });
-            await interaction.editReply(`✅ 訊息已成功發送至 ${targetChannel} 囉喵！`);
-        } catch (err) {
-            console.error('發送 Embed 失敗:', err);
-            await interaction.editReply(`❌ 發送失敗，請確認銀喵在 ${targetChannel} 是否擁有「發送訊息」與「嵌入連結」權限喵！`);
+            if (!interaction.inGuild() || !interaction.guild) {
+                return interaction.reply({ content: '❌ /embed 只能在伺服器內使用喵！', flags: [MessageFlags.Ephemeral] });
+            }
+
+            const title = interaction.options.getString('title', true).trim();
+            const description = interaction.options.getString('description', true).replace(/\\n/g, '\n').trim();
+            const channel = interaction.options.getChannel('channel') || interaction.channel;
+            const color = interaction.options.getString('color');
+            const url = validateUrl(interaction.options.getString('url'), '標題連結');
+            const imageUrl = validateUrl(interaction.options.getString('image_url'), '圖片');
+            const thumbnail = validateUrl(interaction.options.getString('thumbnail'), '縮圖');
+            const attachment = interaction.options.getAttachment('image');
+            const footer = interaction.options.getString('footer');
+
+            if (!title || title.length > 256) throw new Error('標題不可空白，且最多 256 個字元。');
+            if (!description || description.length > 4096) throw new Error('內文不可空白，且最多 4096 個字元。');
+            if (color && !/^#[0-9A-F]{6}$/i.test(color.trim())) throw new Error('顏色請使用六位色碼，例如 #F43F5E。');
+
+            if (attachment && !imageUrl) {
+                const isImage = (attachment.contentType && attachment.contentType.startsWith('image/'))
+                    || /\\.(png|jpe?g|gif|webp|avif)$/i.test(attachment.name || '');
+                if (!isImage) throw new Error('上傳的附件不是可辨識的圖片格式。');
+            }
+
+            await checkChannel(interaction.guild, channel);
+
+            const embed = new EmbedBuilder()
+                .setAuthor({ name: interaction.guild.name, iconURL: interaction.guild.iconURL() || undefined })
+                .setTitle(title)
+                .setDescription(description)
+                .setColor(color ? color.trim() : '#F43F5E')
+                .setTimestamp()
+                .setFooter({
+                    text: footer && footer.trim() ? footer.trim() : '發送者：' + interaction.user.tag,
+                    iconURL: interaction.user.displayAvatarURL()
+                });
+
+            if (url) embed.setURL(url);
+            if (imageUrl || attachment) embed.setImage(imageUrl || attachment.url);
+            if (thumbnail) embed.setThumbnail(thumbnail);
+
+            await interaction.reply({
+                content: '✨ **Embed 卡片預覽**\n目前 1/10 張。可追加卡片，確認後再發送到指定頻道。',
+                embeds: [embed],
+                components: [createControls(channel.id)],
+                flags: [MessageFlags.Ephemeral]
+            });
+        } catch (error) {
+            console.error('建立 Embed 預覽失敗:', error);
+            const response = { content: '❌ ' + (error.message || '建立 Embed 時發生錯誤。'), flags: [MessageFlags.Ephemeral] };
+            if (interaction.replied || interaction.deferred) {
+                await interaction.followUp(response).catch(() => null);
+            } else {
+                await interaction.reply(response).catch(() => null);
+            }
         }
     }
 };

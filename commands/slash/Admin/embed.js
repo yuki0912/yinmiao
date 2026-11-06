@@ -113,7 +113,6 @@ module.exports = {
         .addStringOption(option => option.setName('author_url').setDescription('Author：作者連結網址').setMaxLength(2000).setRequired(false))
         .addStringOption(option => option.setName('thumbnail').setDescription('Thumbnail：右上角縮圖網址').setMaxLength(2000).setRequired(false))
         .addStringOption(option => option.setName('image').setDescription('Image：卡片底部大圖網址').setMaxLength(2000).setRequired(false))
-        .addBooleanOption(option => option.setName('timestamp').setDescription('Timestamp：是否顯示目前時間').setRequired(false))
         .addBooleanOption(option => option.setName('timestamp').setDescription('Timestamp：是否顯示目前時間').setRequired(false)),
 
     async execute(interaction) {

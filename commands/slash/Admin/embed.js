@@ -56,8 +56,6 @@ function buildInitialEmbed(interaction) {
     const authorUrl = validateUrl(get('author_url'), 'Author 連結');
     const thumbnail = validateUrl(get('thumbnail'), 'Thumbnail');
     const image = validateUrl(get('image'), 'Image');
-    const footer = get('footer');
-    const footerIcon = validateUrl(get('footer_icon_url'), 'Footer 圖示');
 
     if (title) embed.setTitle(title);
     if (description) embed.setDescription(description.replace(/\\n/g, '\n'));
@@ -82,13 +80,11 @@ function buildInitialEmbed(interaction) {
     const timestamp = interaction.options.getBoolean('timestamp');
     if (timestamp) embed.setTimestamp();
 
-    if (footer) {
-        const footerData = { text: footer };
-        if (footerIcon) footerData.iconURL = footerIcon;
-        embed.setFooter(footerData);
-    } else if (footerIcon) {
-        throw new Error('設定 Footer 圖示時，必須同時填寫 Footer 文字。');
-    }
+    const footerName = interaction.member?.displayName || interaction.user.globalName || interaction.user.username;
+    embed.setFooter({
+        text: footerName,
+        iconURL: interaction.user.displayAvatarURL({ size: 256 })
+    });
 
     const fields = [];
     for (let i = 1; i <= 4; i++) {
@@ -133,8 +129,6 @@ module.exports = {
         .addStringOption(option => option.setName('thumbnail').setDescription('Thumbnail：右上角縮圖網址').setMaxLength(2000).setRequired(false))
         .addStringOption(option => option.setName('image').setDescription('Image：卡片底部大圖網址').setMaxLength(2000).setRequired(false))
         .addBooleanOption(option => option.setName('timestamp').setDescription('Timestamp：是否顯示目前時間').setRequired(false))
-        .addStringOption(option => option.setName('footer').setDescription('Footer：頁尾文字').setMaxLength(2048).setRequired(false))
-        .addStringOption(option => option.setName('footer_icon_url').setDescription('Footer：頁尾圖示網址').setMaxLength(2000).setRequired(false))
         .addStringOption(option => option.setName('field1_name').setDescription('Field 1：欄位名稱').setMaxLength(256).setRequired(false))
         .addStringOption(option => option.setName('field1_value').setDescription('Field 1：欄位內容').setMaxLength(1024).setRequired(false))
         .addBooleanOption(option => option.setName('field1_inline').setDescription('Field 1：是否 Inline').setRequired(false))

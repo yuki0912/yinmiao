@@ -45,7 +45,7 @@ module.exports = {
             if (targetUser) {
                 replyText = `🧹 已成功清理成員 ${targetUser} 的 **${deleted.size}** 則訊息。`;
             }
-            replyText += `\\n（此訊息將於 5 秒後自動刪除）`;
+            replyText += `\n（此訊息將於 5 秒後自動刪除）`;
 
             // 6. 發送公開回覆
             await interaction.reply({ content: replyText });

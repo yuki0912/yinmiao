@@ -161,7 +161,7 @@ function addCardModal(channelId, currentCount) {
         ['card_description', 'Description（內文）', TextInputStyle.Paragraph, false],
         ['card_color', 'Color（例如 #0099ff）', TextInputStyle.Short, false],
         ['card_image', 'Image URL（大圖網址）', TextInputStyle.Short, false],
-        ['card_advanced', '其他設定（見欄位說明）', TextInputStyle.Paragraph, false]
+        ['card_advanced', '其他設定（Footer 自動使用你的名稱和頭像）', TextInputStyle.Paragraph, false]
     ];
 
     for (const [id, label, style, required] of inputs) {

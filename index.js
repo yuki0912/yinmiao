@@ -743,13 +743,10 @@ function loadAllCommands(baseDir, collection) {
 function loadHandlers() {
     const eventsPath = path.join(__dirname, 'events');
     if (!fs.existsSync(eventsPath)) {
-        console.warn('⚠️ 找不到 events 資料夾，沒有載入任何事件。');
         return;
     }
 
     const files = fs.readdirSync(eventsPath).filter(file => file.endsWith('.js'));
-    let loadedCount = 0;
-
     for (const file of files) {
         const eventPath = path.join(eventsPath, file);
 
@@ -758,7 +755,7 @@ function loadHandlers() {
             const event = require(eventPath);
 
             if (!event || !event.name || typeof event.execute !== 'function') {
-                console.warn('[事件載入] 略過無效事件檔案：', file);
+                continue;
                 continue;
             }
 
@@ -824,14 +821,11 @@ function loadHandlers() {
                 client.on(event.name, listener);
             }
 
-            loadedCount++;
-            console.log('[事件載入] 已載入：' + file + ' (' + event.name + ')');
         } catch (error) {
             console.error('[事件載入失敗] ' + file + ':', error);
         }
     }
 
-    console.log('✅ 事件載入完成，共載入 ' + loadedCount + ' 個事件。');
 }
 
 async function startServer() {

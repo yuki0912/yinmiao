@@ -14,7 +14,11 @@ async function replyAndAutoDelete(interaction, content, ephemeral = false) {
     const payload = { content };
     if (ephemeral) payload.flags = MessageFlags.Ephemeral;
 
-    await interaction.reply(payload);
+    if (interaction.deferred) {
+        await interaction.editReply(payload);
+    } else {
+        await interaction.reply(payload);
+    }
     await delay(AUTO_DELETE_DELAY);
 
     try {
@@ -26,6 +30,52 @@ async function replyAndAutoDelete(interaction, content, ephemeral = false) {
             console.error('[clear] 自動刪除指令回覆失敗:', error);
         }
     }
+}
+
+async function deleteSelectedMessages(channel, messages) {
+    const fourteenDays = 14 * 24 * 60 * 60 * 1000;
+    const cutoff = Date.now() - fourteenDays;
+    const recentMessages = [];
+    const oldMessages = [];
+
+    for (const message of messages.values()) {
+        // Discord 批量刪除 API 不接受超過 14 天的訊息。
+        if (message.createdTimestamp > cutoff) recentMessages.push(message);
+        else oldMessages.push(message);
+    }
+
+    let deletedCount = 0;
+    let failedCount = 0;
+
+    const deleteOneByOne = async messageList => {
+        for (const message of messageList) {
+            try {
+                await message.delete();
+                deletedCount++;
+            } catch (error) {
+                failedCount++;
+                console.error('[clear] 單則訊息刪除失敗:', message.id, error);
+            }
+        }
+    };
+
+    // 至少兩則且都在 14 天內，才使用 Discord 批量刪除。
+    if (recentMessages.length >= 2) {
+        try {
+            const deleted = await channel.bulkDelete(recentMessages, false);
+            deletedCount += deleted.size;
+        } catch (error) {
+            console.error('[clear] 批量刪除失敗，改為逐則刪除:', error);
+            await deleteOneByOne(recentMessages);
+        }
+    } else {
+        await deleteOneByOne(recentMessages);
+    }
+
+    // 超過 14 天的訊息改用逐則刪除，不再被 bulkDelete 靜默略過。
+    await deleteOneByOne(oldMessages);
+
+    return { deletedCount, failedCount, oldMessageCount: oldMessages.length };
 }
 
 module.exports = {
@@ -94,12 +144,20 @@ module.exports = {
                 return;
             }
 
-            // true：忽略超過 14 天的訊息，避免 Discord 批量刪除 API 拒絕整批請求。
-            const deleted = await channel.bulkDelete(filteredMessages, true);
+            // 在開始刪除前先確認互動，避免逐則刪除舊訊息時超過 Discord 回覆時限。
+            await interaction.deferReply();
 
-            const replyText = targetUser
-                ? `🧹 已成功清理成員 ${targetUser} 的 **${deleted.size}** 則訊息。\n（此提示將於 5 秒後自動刪除）`
-                : `🧹 已成功清理 **${deleted.size}** 則訊息。\n（此提示將於 5 秒後自動刪除）`;
+            const result = await deleteSelectedMessages(channel, filteredMessages);
+            const targetText = targetUser ? `成員 ${targetUser} 的 ` : '';
+            let replyText = `🧹 已刪除 ${targetText}**${result.deletedCount}** 則訊息。`;
+
+            if (result.oldMessageCount > 0) {
+                replyText += `\\n其中 ${result.oldMessageCount} 則超過 14 天，已改用逐則刪除。`;
+            }
+            if (result.failedCount > 0) {
+                replyText += `\\n⚠️ 另有 ${result.failedCount} 則訊息刪除失敗，請檢查後台 Log 及 Bot 權限。`;
+            }
+            replyText += '\\n（此提示將於 5 秒後自動刪除）';
 
             await replyAndAutoDelete(interaction, replyText, false);
         } catch (error) {
@@ -109,18 +167,10 @@ module.exports = {
                 ? '❌ 銀喵缺少必要權限，請確認已授予「管理訊息」及相關頻道權限。'
                 : `❌ 清理訊息失敗：${error.message || '請檢查頻道權限或訊息狀態。'}`;
 
-            // 錯誤提示也會在 5 秒後刪除，避免訊息長期留在頻道。
-            if (!interaction.replied && !interaction.deferred) {
-                await replyAndAutoDelete(interaction, errorMessage, true).catch(replyError => {
-                    console.error('[clear] 無法發送錯誤提示:', replyError);
-                });
-            } else {
-                try {
-                    await interaction.followUp({ content: errorMessage, flags: MessageFlags.Ephemeral });
-                } catch (replyError) {
-                    console.error('[clear] 無法發送後續錯誤提示:', replyError);
-                }
-            }
+            // 若互動已 defer，更新原始回覆；否則建立短暫的私密錯誤提示。
+            await replyAndAutoDelete(interaction, errorMessage, !interaction.deferred && !interaction.replied).catch(replyError => {
+                console.error('[clear] 無法發送錯誤提示:', replyError);
+            });
         }
     }
 };

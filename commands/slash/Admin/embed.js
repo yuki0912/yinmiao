@@ -42,9 +42,12 @@ async function checkChannel(guild, channel) {
     }
     const me = guild.members.me || await guild.members.fetchMe().catch(() => null);
     const permissions = me && channel.permissionsFor(me);
+    const sendPermission = typeof channel.isThread === 'function' && channel.isThread()
+        ? PermissionFlagsBits.SendMessagesInThreads
+        : PermissionFlagsBits.SendMessages;
     const required = [
         PermissionFlagsBits.ViewChannel,
-        PermissionFlagsBits.SendMessages,
+        sendPermission,
         PermissionFlagsBits.EmbedLinks
     ];
     if (!permissions || !permissions.has(required)) {
@@ -89,7 +92,7 @@ module.exports = {
 
             if (attachment && !imageUrl) {
                 const isImage = (attachment.contentType && attachment.contentType.startsWith('image/'))
-                    || /\\.(png|jpe?g|gif|webp|avif)$/i.test(attachment.name || '');
+                    || /\.(png|jpe?g|gif|webp|avif)$/i.test(attachment.name || '');
                 if (!isImage) throw new Error('上傳的附件不是可辨識的圖片格式。');
             }
 

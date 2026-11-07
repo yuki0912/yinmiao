@@ -1,211 +1,332 @@
 const { SlashCommandBuilder, AttachmentBuilder } = require('discord.js');
-const { createCanvas, loadImage, GlobalFonts } = require('@napi-rs/canvas'); 
-const UserProfile = require('../../../models/UserProfile'); 
+const { createCanvas, loadImage, GlobalFonts } = require('@napi-rs/canvas');
+const UserProfile = require('../../../models/UserProfile');
 const path = require('node:path');
 const fs = require('node:fs');
 
-// ====================================================
-// 🎯 🛡️ 中文字型完美防護盾設定（最外層根目錄專用）
-// ====================================================
-// 使用 process.cwd() 直接精準鎖定與 index.js 同層的最外層目錄
-const fontPath = path.join(process.cwd(), 'NotoSansTC-Bold.ttf');
-let fontStyle = 'sans-serif'; 
+// 卡片專用中文字型；以程式檔位置尋找，避免部署目錄不同而找不到。
+const fontPath = path.join(__dirname, '../../../NotoSansTC-Bold.ttf');
+let fontFamily = 'sans-serif';
 
 if (fs.existsSync(fontPath)) {
-    GlobalFonts.registerFromPath(fontPath, 'NotoSansTC');
-    fontStyle = 'NotoSansTC'; 
-    console.log('✅ [銀喵字型系統] 成功載入最外層中文字型：NotoSansTC-Bold.ttf');
-} else {
-    console.warn('⚠️ [銀喵字型系統] 未找到字型檔，Linux 環境下中文字可能會變成方塊亂碼！');
-    console.warn(`請確認字型檔是否確實與 index.js 放在一起: ${fontPath}`);
+    try {
+        GlobalFonts.registerFromPath(fontPath, 'YinMiaoRank');
+        fontFamily = 'YinMiaoRank';
+    } catch (error) {
+        console.warn('[rank] 無法載入中文字型，改用系統字型:', error.message);
+    }
 }
 
-/**
- * 💡 Mee6 標準公式
- */
-const getTotalXpForLevel = (lvl) => {
+function getTotalXpForLevel(level) {
     let total = 0;
-    for (let i = 1; i < lvl; i++) {
+    for (let i = 1; i < level; i++) {
         total += 5 * (i ** 2) + 50 * i + 100;
     }
     return total;
-};
+}
+
+function roundedFill(ctx, x, y, width, height, radius, color) {
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.roundRect(x, y, width, height, radius);
+    ctx.fill();
+}
+
+function drawStar(ctx, x, y, size, color) {
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.moveTo(x, y - size);
+    ctx.quadraticCurveTo(x + size * 0.2, y - size * 0.2, x + size, y);
+    ctx.quadraticCurveTo(x + size * 0.2, y + size * 0.2, x, y + size);
+    ctx.quadraticCurveTo(x - size * 0.2, y + size * 0.2, x - size, y);
+    ctx.quadraticCurveTo(x - size * 0.2, y - size * 0.2, x, y - size);
+    ctx.fill();
+}
+
+function drawCorner(ctx, x, y, directionX, directionY, color) {
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(x + directionX * 22, y);
+    ctx.lineTo(x, y);
+    ctx.lineTo(x, y + directionY * 22);
+    ctx.stroke();
+}
+
+function drawStat(ctx, x, label, value, accent) {
+    roundedFill(ctx, x, 206, 141, 76, 12, 'rgba(10, 21, 36, 0.67)');
+    ctx.fillStyle = '#AFC1CD';
+    ctx.font = 'bold 12px ' + fontFamily;
+    ctx.textAlign = 'left';
+    ctx.fillText(label, x + 13, 230, 115);
+    ctx.fillStyle = accent;
+    ctx.font = 'bold 25px ' + fontFamily;
+    ctx.fillText(String(value), x + 13, 264, 115);
+}
+
+function drawCard(ctx, data) {
+    const W = 1000;
+    const H = 330;
+    const colors = {
+        gold: '#F5D69E',
+        pink: '#F2A9B4',
+        ice: '#A8E0DC',
+        white: '#F8F3EC',
+        muted: '#AFC1CD',
+        dark: '#0A1524',
+        panel: '#122239'
+    };
+
+    ctx.clearRect(0, 0, W, H);
+
+    // 左側冒險者檔案：深藍漸層、細格紋、日系遊戲的裝飾邊角。
+    const bg = ctx.createLinearGradient(0, 0, 690, 330);
+    bg.addColorStop(0, '#122438');
+    bg.addColorStop(0.6, '#18283B');
+    bg.addColorStop(1, '#0E1B2F');
+    roundedFill(ctx, 0, 0, 690, 330, 23, bg);
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.roundRect(0, 0, 690, 330, 23);
+    ctx.clip();
+
+    ctx.strokeStyle = 'rgba(168, 224, 220, 0.06)';
+    ctx.lineWidth = 1;
+    for (let i = -330; i < 900; i += 34) {
+        ctx.beginPath();
+        ctx.moveTo(i, 0);
+        ctx.lineTo(i + 330, 330);
+        ctx.stroke();
+    }
+
+    const glow = ctx.createRadialGradient(80, 126, 10, 80, 126, 320);
+    glow.addColorStop(0, 'rgba(242,169,180,0.18)');
+    glow.addColorStop(1, 'rgba(242,169,180,0)');
+    ctx.fillStyle = glow;
+    ctx.fillRect(0, 0, 500, 330);
+
+    // 標題和徽章
+    ctx.fillStyle = colors.gold;
+    ctx.textAlign = 'left';
+    ctx.font = 'bold 17px ' + fontFamily;
+    ctx.fillText('冒険者の記録', 35, 39);
+    ctx.fillStyle = colors.muted;
+    ctx.font = 'bold 11px ' + fontFamily;
+    ctx.fillText('ADVENTURER PROFILE', 202, 38);
+
+    roundedFill(ctx, 504, 18, 148, 30, 14, 'rgba(245, 214, 158, 0.10)');
+    ctx.fillStyle = colors.gold;
+    ctx.font = 'bold 11px ' + fontFamily;
+    ctx.textAlign = 'center';
+    ctx.fillText('✦ PERMANENT XP', 578, 38, 135);
+
+    ctx.strokeStyle = 'rgba(245,214,158,0.35)';
+    ctx.beginPath();
+    ctx.moveTo(33, 60);
+    ctx.lineTo(659, 60);
+    ctx.stroke();
+
+    drawStar(ctx, 48, 169, 7, colors.pink);
+    drawStar(ctx, 182, 104, 5, colors.ice);
+    drawStar(ctx, 176, 209, 4, colors.gold);
+    drawCorner(ctx, 23, 23, 1, 1, 'rgba(245,214,158,0.7)');
+    drawCorner(ctx, 667, 307, -1, -1, 'rgba(245,214,158,0.7)');
+
+    // 角色頭像外框，保留 Discord 真實頭像。
+    ctx.strokeStyle = colors.gold;
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.arc(113, 163, 76, 0, Math.PI * 2);
+    ctx.stroke();
+
+    ctx.strokeStyle = 'rgba(242,169,180,0.76)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(113, 163, 82, Math.PI * 0.15, Math.PI * 1.72);
+    ctx.stroke();
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(113, 163, 71, 0, Math.PI * 2);
+    ctx.clip();
+    if (data.avatar) {
+        ctx.drawImage(data.avatar, 42, 92, 142, 142);
+    } else {
+        roundedFill(ctx, 40, 90, 146, 146, 70, '#3B526B');
+        ctx.fillStyle = colors.white;
+        ctx.textAlign = 'center';
+        ctx.font = 'bold 70px ' + fontFamily;
+        ctx.fillText('★', 113, 187);
+    }
+    ctx.restore();
+
+    // 名稱與永久資料說明。
+    ctx.textAlign = 'left';
+    ctx.fillStyle = colors.white;
+    ctx.font = 'bold 34px ' + fontFamily;
+    ctx.fillText(data.username, 213, 124, 441);
+
+    ctx.fillStyle = colors.pink;
+    ctx.font = 'bold 14px ' + fontFamily;
+    ctx.fillText('✦ 冒險進度 · 永久累積', 216, 155, 420);
+    ctx.fillStyle = colors.muted;
+    ctx.font = '12px ' + fontFamily;
+    ctx.fillText(data.guildName, 216, 179, 400);
+
+    // 三個長期數據：不再使用「每週」排名或每週經驗值。
+    drawStat(ctx, 215, '伺服器排名', data.serverRank, colors.gold);
+    drawStat(ctx, 363, '累積 EXP', data.totalXpText, colors.ice);
+    drawStat(ctx, 511, '距離下一級', data.remainingText, colors.pink);
+
+    // 底部主進度條。
+    ctx.fillStyle = colors.muted;
+    ctx.font = 'bold 11px ' + fontFamily;
+    ctx.fillText('LEVEL PROGRESS', 37, 310);
+
+    roundedFill(ctx, 216, 301, 438, 10, 5, '#091522');
+    if (data.progress > 0) {
+        const bar = ctx.createLinearGradient(216, 0, 654, 0);
+        bar.addColorStop(0, colors.pink);
+        bar.addColorStop(0.55, colors.gold);
+        bar.addColorStop(1, colors.ice);
+        roundedFill(ctx, 216, 301, 438 * data.progress, 10, 5, bar);
+    }
+
+    ctx.restore();
+
+    // 右上：等級面板。
+    const levelBg = ctx.createLinearGradient(710, 0, 1000, 155);
+    levelBg.addColorStop(0, '#1B3147');
+    levelBg.addColorStop(1, '#101F32');
+    roundedFill(ctx, 710, 0, 290, 155, 22, levelBg);
+    drawCorner(ctx, 729, 20, 1, 1, colors.gold);
+
+    ctx.textAlign = 'left';
+    ctx.fillStyle = colors.muted;
+    ctx.font = 'bold 14px ' + fontFamily;
+    ctx.fillText('LEVEL', 742, 41);
+    ctx.fillStyle = colors.pink;
+    ctx.font = '12px ' + fontFamily;
+    ctx.fillText('レベル', 938, 41);
+
+    roundedFill(ctx, 733, 57, 244, 76, 13, '#0A1726');
+    ctx.textAlign = 'center';
+    ctx.fillStyle = colors.gold;
+    ctx.font = 'bold 53px ' + fontFamily;
+    ctx.fillText(String(data.level), 855, 116, 214);
+
+    // 右下：目前等級內的 EXP，與累積 XP 分開顯示。
+    const expBg = ctx.createLinearGradient(710, 175, 1000, 330);
+    expBg.addColorStop(0, '#1B3147');
+    expBg.addColorStop(1, '#101F32');
+    roundedFill(ctx, 710, 173, 290, 157, 22, expBg);
+    drawCorner(ctx, 979, 310, -1, -1, colors.pink);
+
+    ctx.textAlign = 'left';
+    ctx.fillStyle = colors.muted;
+    ctx.font = 'bold 14px ' + fontFamily;
+    ctx.fillText('EXP', 742, 211);
+    ctx.fillStyle = colors.pink;
+    ctx.font = '12px ' + fontFamily;
+    ctx.fillText('経験値', 932, 211);
+
+    roundedFill(ctx, 733, 225, 244, 56, 13, '#0A1726');
+    ctx.textAlign = 'center';
+    ctx.fillStyle = colors.white;
+    ctx.font = 'bold 22px ' + fontFamily;
+    ctx.fillText(data.levelXpText + ' / ' + data.levelMaxText, 855, 262, 218);
+
+    roundedFill(ctx, 733, 293, 244, 10, 5, '#0A1726');
+    if (data.progress > 0) {
+        const progressBg = ctx.createLinearGradient(733, 0, 977, 0);
+        progressBg.addColorStop(0, colors.pink);
+        progressBg.addColorStop(1, colors.gold);
+        roundedFill(ctx, 733, 293, 244 * data.progress, 10, 5, progressBg);
+    }
+
+    ctx.fillStyle = colors.muted;
+    ctx.font = 'bold 11px ' + fontFamily;
+    ctx.textAlign = 'right';
+    ctx.fillText(Math.round(data.progress * 100) + '%', 976, 320);
+
+    ctx.textAlign = 'left';
+    ctx.fillStyle = colors.muted;
+    ctx.fillText('TO NEXT LEVEL', 735, 320);
+}
 
 module.exports = {
-    category: "Fun",
+    category: 'Fun',
     data: new SlashCommandBuilder()
         .setName('rank')
-        .setDescription('查看你目前的等級與經驗值排行喵！🐾')
+        .setDescription('查看日系 RPG 風格的永久等級與 XP 卡片')
         .addUserOption(option => option.setName('user').setDescription('要查看的成員')),
-    
+
     async execute(interaction) {
         await interaction.deferReply();
-        
-        const targetUser = interaction.options.getUser('user') || interaction.user;
-        const member = await interaction.guild.members.fetch(targetUser.id).catch(() => null);
-        const username = member ? member.displayName : targetUser.username;
-        const avatarUrl = targetUser.displayAvatarURL({ extension: 'png', size: 256 });
-        
-        try {
-            let profile = await UserProfile.findOne({ 
-                userId: targetUser.id, 
-                guildId: interaction.guild.id 
-            });
 
-            if (!profile) {
-                profile = { level: 1, xp: 0, weeklyExp: 0 };
+        try {
+            if (!interaction.guild) {
+                await interaction.editReply({ content: '請在 Discord 伺服器內使用 /rank。' });
+                return;
             }
 
-            const level = profile.level || 1;
-            const totalXp = profile.xp || 0; 
-            const weeklyExp = profile.weeklyExp || 0; 
+            const targetUser = interaction.options.getUser('user') || interaction.user;
+            const member = await interaction.guild.members.fetch(targetUser.id).catch(() => null);
+            const username = member ? member.displayName : targetUser.username;
+            const avatarUrl = targetUser.displayAvatarURL({ extension: 'png', size: 256 });
 
-            const maxExp = 5 * (level ** 2) + 50 * level + 100; 
-            const xpInCurrentLevel = totalXp - getTotalXpForLevel(level);
+            const profile = await UserProfile.findOne({
+                userId: targetUser.id,
+                guildId: interaction.guild.id
+            });
+
+            // xp 是資料庫永久累積經驗值；不再讀取會被週期清空的 weeklyExp。
+            const level = Math.max(1, Math.floor(Number(profile?.level) || 1));
+            const totalXp = Math.max(0, Number(profile?.xp) || 0);
+            const levelMax = 5 * (level ** 2) + 50 * level + 100;
+            const levelXp = Math.max(0, Math.min(levelMax, totalXp - getTotalXpForLevel(level)));
+            const remaining = Math.max(0, levelMax - levelXp);
+            const progress = Math.max(0, Math.min(1, levelXp / levelMax));
 
             const higherXpCount = await UserProfile.countDocuments({
                 guildId: interaction.guild.id,
-                xp: { $gt: totalXp } 
+                xp: { $gt: totalXp }
             });
-            const serverRank = `#${higherXpCount + 1}`;
 
-            let weeklyRank = "Off";
-            if (weeklyExp > 0) {
-                const higherWeeklyCount = await UserProfile.countDocuments({
-                    guildId: interaction.guild.id,
-                    weeklyExp: { $gt: weeklyExp }
-                });
-                weeklyRank = `#${higherWeeklyCount + 1}`;
-            }
-
-            // Canvas 畫布初始化
-            const canvas = createCanvas(900, 230);
-            const ctx = canvas.getContext('2d');
-
-            const colorBg = '#1E1F22';       
-            const colorSlot = '#111214';     
-            const colorTextYellow = '#FFEAA7'; 
-            const colorTextGray = '#949BA4';   
-            const colorTextWhite = '#FFFFFF';  
-
-            ctx.fillStyle = colorBg;
-            ctx.beginPath();
-            ctx.roundRect(0, 0, 620, 230, 20);
-            ctx.fill();
-
-            ctx.save();
-            ctx.beginPath();
-            ctx.roundRect(0, 0, 620, 230, 20);
-            ctx.clip(); 
-
-            const progressPercent = Math.max(0, Math.min(xpInCurrentLevel / maxExp, 1));
-            ctx.fillStyle = '#FFEAA7';
-            ctx.fillRect(0, 222, 620 * progressPercent, 8);
-            ctx.restore(); 
-
-            ctx.save();
-            ctx.beginPath();
-            ctx.arc(105, 115, 65, 0, Math.PI * 2, true);
-            ctx.closePath();
-            ctx.clip();
-
+            let avatar = null;
             try {
-                const avatarImg = await loadImage(avatarUrl);
-                ctx.drawImage(avatarImg, 40, 50, 130, 130);
-            } catch (e) {
-                ctx.fillStyle = '#FF7B9C'; 
-                ctx.fill();
+                avatar = await loadImage(avatarUrl);
+            } catch (error) {
+                console.warn('[rank] 無法載入 Discord 頭像，使用預設圖案:', error.message);
             }
-            ctx.restore();
 
-            ctx.textAlign = 'left'; 
+            const canvas = createCanvas(1000, 330);
+            const ctx = canvas.getContext('2d');
+            drawCard(ctx, {
+                avatar,
+                username,
+                guildName: interaction.guild.name,
+                level,
+                serverRank: '#' + (higherXpCount + 1).toLocaleString(),
+                totalXpText: totalXp.toLocaleString(),
+                remainingText: remaining.toLocaleString(),
+                levelXpText: levelXp.toLocaleString(),
+                levelMaxText: levelMax.toLocaleString(),
+                progress
+            });
 
-            ctx.fillStyle = colorTextYellow;
-            ctx.font = `bold 36px ${fontStyle}`;
-            ctx.fillText(username, 200, 75);
-
-            ctx.fillStyle = colorTextGray;
-            ctx.font = `bold 15px ${fontStyle}`;
-            ctx.fillText('SERVER RANK', 200, 130);
-            ctx.fillText('WEEKLY RANK', 340, 130);
-            ctx.fillText('WEEKLY EXP', 480, 130);
-
-            ctx.fillStyle = colorTextYellow;
-            ctx.font = `bold 30px ${fontStyle}`;
-            ctx.fillText(serverRank, 200, 180); 
-
-            ctx.fillStyle = colorTextWhite;
-            ctx.font = `bold 28px ${fontStyle}`;
-            ctx.fillText(weeklyRank, 340, 180); 
-            
-            ctx.fillText(weeklyExp > 0 ? weeklyExp.toLocaleString() : '0', 480, 180); 
-
-            // 右側 LEVEL
-            ctx.fillStyle = colorBg;
-            ctx.beginPath();
-            ctx.roundRect(640, 0, 260, 105, 20);
-            ctx.fill();
-
-            ctx.textAlign = 'center';
-            ctx.fillStyle = colorTextGray;
-            ctx.font = `bold 14px ${fontStyle}`;
-            ctx.fillText('LEVEL', 640 + 130, 32);
-
-            ctx.fillStyle = colorSlot;
-            ctx.beginPath();
-            ctx.roundRect(660, 42, 220, 46, 10);
-            ctx.fill();
-
-            ctx.fillStyle = colorTextYellow;
-            ctx.font = `bold 26px ${fontStyle}`;
-            ctx.fillText(level, 640 + 130, 74);
-
-            // 右側 EXP
-            ctx.fillStyle = colorBg;
-            ctx.beginPath();
-            ctx.roundRect(640, 125, 260, 105, 20);
-            ctx.fill();
-
-            ctx.textAlign = 'center';
-            ctx.fillStyle = colorTextGray;
-            ctx.font = `bold 14px ${fontStyle}`;
-            ctx.fillText('EXP', 640 + 130, 157);
-
-            ctx.fillStyle = colorSlot;
-            ctx.beginPath();
-            ctx.roundRect(660, 167, 220, 46, 10);
-            ctx.fill();
-
-            ctx.textAlign = 'left'; 
-            const txtCurrent = xpInCurrentLevel.toLocaleString();
-            const txtMax = ` / ${maxExp.toLocaleString()}`;
-
-            ctx.font = `bold 19px ${fontStyle}`;
-            const wCurrent = ctx.measureText(txtCurrent).width;
-            ctx.font = `15px ${fontStyle}`;
-            const wMax = ctx.measureText(txtMax).width;
-
-            const totalWidth = wCurrent + wMax;
-            const startX = 640 + (260 - totalWidth) / 2; 
-
-            ctx.fillStyle = colorTextWhite;
-            ctx.font = `bold 19px ${fontStyle}`;
-            ctx.fillText(txtCurrent, startX, 197);
-
-            ctx.fillStyle = colorTextGray;
-            ctx.font = `15px ${fontStyle}`;
-            ctx.fillText(txtMax, startX + wCurrent, 197);
-
-            const buffer = canvas.toBuffer('image/png');
-            const attachment = new AttachmentBuilder(buffer, { name: 'rank-card.png' });
-            
+            const attachment = new AttachmentBuilder(canvas.toBuffer('image/png'), {
+                name: 'rank-card.png'
+            });
             await interaction.editReply({ files: [attachment] });
 
         } catch (error) {
-            console.error('渲染或讀取資料庫時發生錯誤:', error);
-            if (interaction.deferred) {
-                await interaction.editReply({ content: '抱歉喵，讀取資料庫或生成圖片時發生了點小問題...😿' });
-            }
+            console.error('[rank] 讀取 XP 資料或渲染卡片時發生錯誤:', error);
+            await interaction.editReply({
+                content: '❌ 無法產生 XP 卡片，請稍後再試。'
+            }).catch(replyError => console.error('[rank] 回覆失敗:', replyError));
         }
     }
 };

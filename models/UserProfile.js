@@ -19,7 +19,7 @@ const UserProfileSchema = new mongoose.Schema({
     },
     weeklyExp: { 
         type: Number, 
-        default: 0 // 🐾 新增：當週排行榜經驗值！每週一凌晨會被清空，完全不影響上方的總 xp
+        default: 0 // 舊版相容欄位：不再每週清零；永久等級與排行榜一律使用上方的 xp
     },
     level: { 
         type: Number, 

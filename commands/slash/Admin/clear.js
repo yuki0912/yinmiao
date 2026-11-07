@@ -37,7 +37,7 @@ function getFailureMessage(error) {
     }
 
     return '清理訊息時發生錯誤，請確認頻道及 Bot 權限後再試。' +
-        (error.code ? '\\n錯誤代碼：' + error.code : '');
+        (error.code ? '\n錯誤代碼：' + error.code : '');
 }
 
 module.exports = {
@@ -143,10 +143,10 @@ module.exports = {
             }
 
             if (skippedOldCount > 0) {
-                replyText += `\\n⏭️ 另有 **${skippedOldCount}** 則超過 14 天的訊息未刪除。`;
+                replyText += `\n⏭️ 另有 **${skippedOldCount}** 則超過 14 天的訊息未刪除。`;
             }
 
-            replyText += '\\n（此提示將於 6 秒後自動刪除）';
+            replyText += '\n（此提示將於 6 秒後自動刪除）';
 
             console.log(
                 `[clear] 清理完成：要求=${amount}，符合條件=${matchedMessages.size}，實際刪除=${deletedCount}，略過舊訊息=${skippedOldCount}`
@@ -159,7 +159,7 @@ module.exports = {
 
             const errorMessage =
                 '❌ 清理失敗：' + getFailureMessage(error) +
-                '\\n（此提示將於 6 秒後自動刪除）';
+                '\n（此提示將於 6 秒後自動刪除）';
 
             try {
                 await editReplyAndScheduleDeletion(interaction, errorMessage);

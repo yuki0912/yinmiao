@@ -9,7 +9,6 @@ const MongoStore = require('connect-mongo');
 const mongoose = require('mongoose');
 const OAuth2 = require('discord-oauth2');
 const cors = require('cors');
-const cron = require('node-cron');
 const {
     Client,
     Collection,
@@ -55,7 +54,6 @@ client.prefixCommands = new Collection();
 const GuildConfig = require('./models/GuildConfig');
 const PendingRole = require('./models/PendingRole');
 const ReactionRole = require('./models/ReactionRole');
-const UserProfile = require('./models/UserProfile');
 
 // --- 3. Express 中間件與 Session ---
 app.use(cors());
@@ -794,19 +792,6 @@ async function startServer() {
         console.log('⏳ 正在連接資料庫...');
         await mongooseConnectionPromise;
         console.log('✅ 資料庫連接成功！');
-
-        cron.schedule('0 0 * * 1', async () => {
-            try {
-                console.log('📝 [系統排程] 開始重置本週排行榜經驗值...');
-                const result = await UserProfile.updateMany({}, { $set: { weeklyExp: 0 } });
-                console.log(`✅ 本週排行榜已重置成功！已歸零 ${result.modifiedCount} 筆用戶的當週數據，歷史總 XP 完好無損喵！🐾`);
-            } catch (cronErr) {
-                console.error('❌ 重置當週排行數據時出錯:', cronErr);
-            }
-        }, {
-            scheduled: true,
-            timezone: process.env.TZ
-        });
 
         loadHandlers();
         loadAllCommands(path.join(__dirname, 'commands/slash'), client.slashCommands);

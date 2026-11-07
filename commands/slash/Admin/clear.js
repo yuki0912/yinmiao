@@ -8,7 +8,7 @@ function scheduleReplyDeletion(interaction) {
                 console.error('[clear] 自動刪除回覆失敗:', error);
             }
         });
-    }, 5000);
+    }, 6000);
 }
 
 module.exports = {
@@ -65,20 +65,20 @@ module.exports = {
             // 批量刪除；Discord 會自動忽略超過 14 天的舊訊息。
             const deleted = await interaction.channel.bulkDelete(filteredMessages, true);
 
-            let replyText = `🧹 已成功清理 **${deleted.size}** 則訊息。`;
+            let replyText = `🧹 清理完成！總共刪除了 **${deleted.size}** 則訊息。`;
             if (targetUser) {
-                replyText = `🧹 已成功清理成員 ${targetUser} 的 **${deleted.size}** 則訊息。`;
+                replyText = `🧹 清理完成！已刪除成員 ${targetUser} 的 **${deleted.size}** 則訊息。` ;
             }
 
             await interaction.editReply({
-                content: `${replyText}\n（此提示將於 5 秒後自動刪除）`
+                content: `${replyText}\n（此提示將於 6 秒後自動刪除）`
             });
             scheduleReplyDeletion(interaction);
 
         } catch (error) {
             console.error('[clear] 清理訊息時發生錯誤:', error);
 
-            const errorMessage = '❌ 清理訊息失敗，請確認 Bot 擁有「管理訊息」權限，且頻道及訊息可供清理。\n（此提示將於 5 秒後自動刪除）';
+            const errorMessage = '❌ 清理訊息失敗，請確認 Bot 擁有「管理訊息」權限，且頻道及訊息可供清理。\n（此提示將於 6 秒後自動刪除）';
 
             try {
                 await interaction.editReply({ content: errorMessage });

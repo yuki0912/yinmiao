@@ -1,59 +1,106 @@
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const { EmbedBuilder } = require('discord.js');
+
+const UPDATE_INTERVAL_MS = 5000;
+const MAX_RUNNING_TIME_MS = 5 * 60 * 1000;
+const TIME_ZONE = process.env.TZ || 'Asia/Kuala_Lumpur';
+
+function createClockEmbed(now = new Date(), isStopped = false) {
+    const dateText = new Intl.DateTimeFormat('zh-TW', {
+        timeZone: TIME_ZONE,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        weekday: 'long'
+    }).format(now);
+
+    const timeText = new Intl.DateTimeFormat('zh-TW', {
+        timeZone: TIME_ZONE,
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hourCycle: 'h23'
+    }).format(now);
+
+    return new EmbedBuilder()
+        .setColor(isStopped ? '#808080' : '#ffb7c5')
+        .setTitle(isStopped ? '⏱️ 銀喵實時時鐘已停止' : '⏱️ 銀喵實時時鐘')
+        .setDescription(
+            isStopped
+                ? '本次時鐘已運行 5 分鐘並自動停止。再次輸入 `s!time` 即可重新啟動喵～'
+                : '以下時間會自動更新，讓你隨時掌握現在的時間喵！'
+        )
+        .addFields(
+            { name: '📅 當前日期', value: dateText, inline: true },
+            { name: '🕒 馬來西亞時間', value: `**${timeText}**`, inline: true },
+            {
+                name: '🌏 時區',
+                value: TIME_ZONE,
+                inline: true
+            }
+        )
+        .setThumbnail('https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/512x512/23f1.png')
+        .setFooter({
+            text: isStopped
+                ? '時鐘已停止 · 需要時可重新輸入指令'
+                : '每 5 秒自動更新一次 · 最長運行 5 分鐘'
+        })
+        .setTimestamp(now);
+}
 
 module.exports = {
+    name: 'time',
+    aliases: ['clock', '時間', '時鐘', '實時時間'],
     category: 'Admin',
-    data: new SlashCommandBuilder()
-        .setName('time')
-        .setDescription('顯示一個會自動更新的實時時鐘，讓主人知道現在幾點喵！'),
+    description: '顯示每 5 秒自動更新的實時時鐘',
 
-    async execute(interaction) {
-        
-        // 1. 建立 Embed 的函數
-        const createClockEmbed = (isStopped = false) => {
-            const now = new Date();
-            const timestamp = Math.floor(now.getTime() / 1000);
-            
-            // 💡 Discord 內建動態時間戳記會在用戶的手機/電腦螢幕上「自己跳秒」喔！
-            const discordTime = `<t:${timestamp}:T>`;
-            const discordDate = `<t:${timestamp}:D>`;
-
-            return new EmbedBuilder()
-                .setColor(isStopped ? '#808080' : '#ffb7c5') // 停止後變灰色
-                .setTitle(isStopped ? '⏱️ 時鐘已停止休息' : '⏱️ 銀喵實時時鐘')
-                .setDescription(isStopped ? '時鐘累了，請重新輸入指令召喚喵～' : '這是銀喵為您準備的精準時間喔！')
-                .addFields(
-                    { name: '📅 當前日期', value: discordDate, inline: true },
-                    { name: '🕒 精準時間', value: discordTime, inline: true }
-                )
-                .setThumbnail(interaction.client.user.displayAvatarURL()) // 💡 自動從 interaction 抓取 client
-                .setFooter({ text: isStopped ? '已運行 5 分鐘上限' : '為了不被 Discord 討厭，銀喵每 5 秒會整理一次錶面喵！' })
-                .setTimestamp();
-        };
+    // Prefix Command 的參數順序必須是 (message, args, client)。
+    async execute(message, args, client) {
+        let clockMessage;
 
         try {
-            // 2. 發送初始回覆
-            await interaction.reply({ embeds: [createClockEmbed()] });
+            // Prefix 指令需要使用 message.channel.send，而不是 interaction.reply。
+            clockMessage = await message.channel.send({
+                embeds: [createClockEmbed()]
+            });
+        } catch (error) {
+            console.error('[Time Command] 無法發送時鐘訊息:', error);
+            return;
+        }
 
-            // 3. 設定定時器 (每 5 秒刷新一次 Embed 的右下角時間戳)
-            let count = 0;
-            const interval = setInterval(async () => {
-                count += 5; // 每次跳 5 秒
+        const startedAt = Date.now();
+        let isUpdating = false;
 
-                // 安全機制：運行 300 秒 (5 分鐘) 後停止
-                if (count > 300) {
-                    clearInterval(interval);
-                    return await interaction.editReply({ embeds: [createClockEmbed(true)] }).catch(() => null);
+        const timer = setInterval(async () => {
+            if (isUpdating) return;
+            isUpdating = true;
+
+            try {
+                const elapsed = Date.now() - startedAt;
+                const isStopped = elapsed >= MAX_RUNNING_TIME_MS;
+
+                if (isStopped) {
+                    clearInterval(timer);
                 }
 
-                // 執行編輯更新 (直接使用 interaction.editReply，不需要額外宣告變數，更安全)
-                await interaction.editReply({ embeds: [createClockEmbed()] }).catch(err => {
-                    // 🔒 如果使用者把訊息刪掉了，或是頻道關閉了，直接清除計時器防止記憶體洩漏
-                    clearInterval(interval);
+                await clockMessage.edit({
+                    embeds: [createClockEmbed(new Date(), isStopped)]
                 });
-            }, 5000);
 
-        } catch (error) {
-            console.error('Time Command Error:', error);
-        }
+                if (isStopped) {
+                    console.log(
+                        `[Time Command] 時鐘已停止：guild=${message.guild?.id || 'DM'}，user=${message.author.id}`
+                    );
+                }
+            } catch (error) {
+                // 訊息已刪除、頻道不存在或 Bot 失去存取權時，停止更新以免持續重試。
+                clearInterval(timer);
+
+                if (![10003, 10008, 50001].includes(error.code)) {
+                    console.error('[Time Command] 更新時鐘失敗:', error);
+                }
+            } finally {
+                isUpdating = false;
+            }
+        }, UPDATE_INTERVAL_MS);
     }
 };

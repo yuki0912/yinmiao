@@ -1,7 +1,7 @@
 const { EmbedBuilder } = require('discord.js');
 
 const UPDATE_INTERVAL_MS = 5000;
-const MAX_RUNNING_TIME_MS = 5 * 60 * 1000;
+const MAX_RUNNING_TIME_MS = 24 * 60 * 60 * 1000;
 const TIME_ZONE = process.env.TZ || 'Asia/Kuala_Lumpur';
 
 function createClockEmbed(now = new Date(), isStopped = false) {
@@ -26,7 +26,7 @@ function createClockEmbed(now = new Date(), isStopped = false) {
         .setTitle(isStopped ? '⏱️ 銀喵實時時鐘已停止' : '⏱️ 銀喵實時時鐘')
         .setDescription(
             isStopped
-                ? '本次時鐘已運行 5 分鐘並自動停止。再次輸入 `s!time` 即可重新啟動喵～'
+                ? '本次時鐘已連續運行 24 小時並自動停止。再次輸入 `s!time` 即可重新啟動喵～'
                 : '以下時間會自動更新，讓你隨時掌握現在的時間喵！'
         )
         .addFields(
@@ -42,7 +42,7 @@ function createClockEmbed(now = new Date(), isStopped = false) {
         .setFooter({
             text: isStopped
                 ? '時鐘已停止 · 需要時可重新輸入指令'
-                : '每 5 秒自動更新一次 · 最長運行 5 分鐘'
+                : '每 5 秒自動更新一次 · 最長連續運行 24 小時'
         })
         .setTimestamp(now);
 }

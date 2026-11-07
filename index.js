@@ -10,7 +10,6 @@ const mongoose = require('mongoose');
 const OAuth2 = require('discord-oauth2');
 const cors = require('cors');
 const cron = require('node-cron');
-const { monitorEventLoopDelay, performance } = require('node:perf_hooks');
 const {
     Client,
     Collection,
@@ -37,25 +36,6 @@ const isProduction = process.env.NODE_ENV === 'production';
 const mongooseConnectionPromise = mongoose.connect(process.env.MONGODB_URI);
 
 // --- 2. 初始化 Discord Bot ---
-// 使用單調時鐘監測真正的 Event Loop 延遲，不依賴 Windows 系統時間。
-const eventLoopDelayMonitor = monitorEventLoopDelay({ resolution: 20 });
-eventLoopDelayMonitor.enable();
-
-const eventLoopMonitorTimer = setInterval(() => {
-    const maxMs = eventLoopDelayMonitor.max / 1e6;
-    const p99Ms = eventLoopDelayMonitor.percentile(99) / 1e6;
-
-    if (maxMs >= 500 || p99Ms >= 200) {
-        console.warn(
-            '[EventLoop] 偵測到事件迴圈延遲：p99=' +
-            p99Ms.toFixed(1) + 'ms，max=' + maxMs.toFixed(1) + 'ms（最近 30 秒）'
-        );
-    }
-
-    eventLoopDelayMonitor.reset();
-}, 30000);
-eventLoopMonitorTimer.unref();
-
 const client = new Client({
     intents: [
         GatewayIntentBits.Guilds,
@@ -457,22 +437,21 @@ app.post('/api/save-config', async (req, res) => {
 
         const updateData = {};
 
-        // 僅更新本次請求實際傳入的欄位，避免部分更新把其他開關意外重設為 false。
         const welcomeFieldMap = {
             welcomeChannelId: 'welcomeChannelId',
             welcomeContent: 'welcomeContent',
             welcomeTitle: 'welcomeTitle',
             welcomeDescription: 'welcomeDescription',
             welcomeEmbedColor: 'welcomeEmbedColor',
-            embedColor: 'welcomeEmbedColor', // 舊版前端欄位名稱相容
+            embedColor: 'welcomeEmbedColor',
             welcomeImageUrl: 'welcomeImageUrl',
             canvasText: 'canvasText',
-            canvasMainText: 'canvasText', // 舊版／新版 Canvas 主標題欄位統一保存
+            canvasMainText: 'canvasText',
             canvasSubText: 'canvasSubText',
             canvasColor: 'canvasColor',
             canvasSubColor: 'canvasSubColor',
             canvasBg: 'canvasBg',
-            canvasBackgroundUrl: 'canvasBg', // 舊欄位名稱統一保存到 canvasBg
+            canvasBackgroundUrl: 'canvasBg',
             customBg: 'canvasBg',
             canvasOverlayOpacity: 'canvasOverlayOpacity',
             welcomeFooter: 'welcomeFooter',
@@ -512,7 +491,6 @@ app.post('/api/save-config', async (req, res) => {
             for (const [inputKey, dbKey] of Object.entries(welcomeFieldMap)) {
                 if (rawData[inputKey] === undefined) continue;
 
-                // 若新欄位與舊別名同時存在，優先使用正式欄位。
                 if (inputKey === 'embedColor' && rawData.welcomeEmbedColor !== undefined) continue;
                 if (inputKey === 'canvasMainText' && rawData.canvasText !== undefined) continue;
                 if (['canvasBackgroundUrl', 'customBg'].includes(inputKey) && rawData.canvasBg !== undefined) continue;
@@ -548,7 +526,6 @@ app.post('/api/save-config', async (req, res) => {
                 updateData[key] = rawData[key] === true || rawData[key] === 'true';
             }
 
-            // 明確關閉 Embed 時，同步停用只適用於 Embed 的顯示選項。
             if (rawData.sendEmbed === false || rawData.sendEmbed === 'false') {
                 updateData.showTimestamp = false;
                 updateData.showFooter = false;
@@ -758,10 +735,7 @@ function loadHandlers() {
                 continue;
             }
 
-            // 直接呼叫事件函式，讓 async handler 在 Gateway callback 內立即開始，
-            // 不額外排入 Promise microtask；並量度進入第一個 await 前的同步執行時間。
             const listener = (...args) => {
-                const startedAt = performance.now();
                 let execution;
 
                 try {
@@ -770,30 +744,19 @@ function loadHandlers() {
                     execution = Promise.reject(error);
                 }
 
-                const synchronousDuration = performance.now() - startedAt;
-                if (synchronousDuration >= 100) {
-                    console.warn(
-                        '[EventHandlerSyncSlow] ' + file + ' (' + event.name + ') 在第一個 await 前執行 ' +
-                        synchronousDuration.toFixed(1) + 'ms。'
-                    );
-                }
-
                 Promise.resolve(execution).catch(async error => {
                     console.error('[EventHandlerError] ' + file + ' (' + event.name + '):', error);
 
-                    // InteractionCreate 若在內部發生未預期錯誤，盡可能向使用者回覆。
                     if (event.name !== Events.InteractionCreate) return;
 
                     const interaction = args[0];
                     if (!interaction || typeof interaction.isRepliable !== 'function' || !interaction.isRepliable()) return;
 
-                    // Unknown interaction / already acknowledged：不可再送出第二次 callback。
                     if (
                         interaction.__yinmiaoAckHandled
                         || error.code === 10062
                         || error.code === 40060
                     ) {
-                        console.warn('[InteractionFallback] 互動已逾時或已確認，略過重覆回覆。');
                         return;
                     }
 
@@ -824,7 +787,6 @@ function loadHandlers() {
             console.error('[EventHandlerRequireError] ' + file + ':', error);
         }
     }
-
 }
 
 async function startServer() {

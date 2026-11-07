@@ -3,7 +3,7 @@ const { SlashCommandBuilder } = require('discord.js');
 module.exports = {
     category: "General",
     data: new SlashCommandBuilder()
-        .setName('URL')
+        .setName('url')
         .setDescription('🔗 自動修復 Twitter / X 及 Pixiv 連結排版預覽')
         .setDMPermission(false)
         .addStringOption(option =>

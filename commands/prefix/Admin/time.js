@@ -69,16 +69,20 @@ module.exports = {
                     timer = setTimeout(updateClock, UPDATE_INTERVAL_MS);
                 }
             } catch (error) {
-                stopped = true;
-                if (timer) clearTimeout(timer);
-
-                // 訊息被刪除或 Bot 失去頻道存取權時，停止重試。
-                if (![10003, 10008, 50001].includes(error.code)) {
-                    console.error('[Time Command] 更新時鐘失敗:', error);
-                } else {
+                // 訊息已刪除、頻道不存在或沒有存取權時，才永久停止這個時鐘。
+                if ([10003, 10008, 50001].includes(error.code)) {
+                    stopped = true;
+                    if (timer) clearTimeout(timer);
                     console.log(
                         `[Time Command] 時鐘已停止更新：guild=${message.guild?.id || 'DM'}，channel=${message.channel.id}`
                     );
+                    return;
+                }
+
+                // 其他暫時性錯誤只記錄並重試，避免短暫網路問題令時鐘永久停止。
+                console.error('[Time Command] 更新時鐘暫時失敗，5 秒後重試:', error);
+                if (!stopped) {
+                    timer = setTimeout(updateClock, UPDATE_INTERVAL_MS);
                 }
             }
         };

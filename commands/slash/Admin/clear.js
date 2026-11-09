@@ -101,13 +101,19 @@ module.exports = {
             const amount = parseAmount(interaction.options.getInteger('amount'));
             const targetUserId = interaction.options.getUser('user')?.id || null;
 
-            await checkClearPermissions(
+            const botUserId = await checkClearPermissions(
                 interaction.guild, interaction.channel, interaction.memberPermissions
             );
 
-            // Slash 指令不是一般訊息，不需要 amount + 1，也不需要扣掉 1。
+            // 公開 deferReply 產生的 Bot 回覆也在頻道中：排除這則訊息，
+            // 並同時保護銀喵以往發過的所有訊息。
+            const originalReply = await interaction.fetchReply().catch(error => {
+                console.warn('[clear/slash] 取得原始回覆 ID 失敗，仍會保護 Bot 訊息:', error.code);
+                return null;
+            });
             const stats = await clearChannelMessages({
-                channel: interaction.channel, amount, targetUserId
+                channel: interaction.channel, amount, targetUserId,
+                botUserId, excludeMessageId: originalReply?.id || null
             });
             resultText = formatClearResult(stats, targetUserId, 5);
 

@@ -32,6 +32,10 @@ async function checkClearPermissions(guild, channel, memberPermissions) {
     ])) {
         throw new Error('CLEAR_BOT_PERMISSION');
     }
+
+    // 回傳銀喵自己的 ID，讓兩種 clear 都不會刪到 Bot 的任何訊息。
+    if (!botMember?.id) throw new Error('CLEAR_BOT_PERMISSION');
+    return botMember.id;
 }
 
 // amount 表示「檢查最近 N 則非指令訊息」，不是無限制向前翻找符合條件的訊息。
@@ -63,11 +67,20 @@ async function fetchRecentMessages(channel, amount, excludeMessageId = null) {
     return result;
 }
 
-async function clearChannelMessages({ channel, amount, targetUserId = null, excludeMessageId = null }) {
+async function clearChannelMessages({
+    channel, amount, targetUserId = null, excludeMessageId = null, botUserId
+}) {
+    // 如果無法識別銀喵的 ID，不冒險執行批次刪除。
+    if (!botUserId) throw new Error('CLEAR_BOT_PERMISSION');
+
     const messages = await fetchRecentMessages(channel, amount, excludeMessageId);
     const selected = messages.filter(m => !targetUserId || m.author?.id === targetUserId);
-    const skippedPinned = selected.filter(m => m.pinned).size;
-    const unpinned = selected.filter(m => !m.pinned);
+
+    // 保護銀喵的所有訊息，包括正在回應的 /clear 公開訊息。
+    const skippedBot = selected.filter(m => m.author?.id === botUserId).size;
+    const otherMessages = selected.filter(m => m.author?.id !== botUserId);
+    const skippedPinned = otherMessages.filter(m => m.pinned).size;
+    const unpinned = otherMessages.filter(m => !m.pinned);
     const cutoff = Date.now() - TWO_WEEKS_MS + AGE_MARGIN_MS;
     const skippedOld = unpinned.filter(m => m.createdTimestamp <= cutoff).size;
     const recent = unpinned.filter(m => m.createdTimestamp > cutoff);
@@ -93,7 +106,7 @@ async function clearChannelMessages({ channel, amount, targetUserId = null, excl
 
     return {
         requested: amount, inspected: messages.size, matched: selected.size, deleted,
-        skippedPinned, skippedOld, skippedUndeletable, disappeared
+        skippedBot, skippedPinned, skippedOld, skippedUndeletable, disappeared
     };
 }
 
@@ -101,6 +114,7 @@ function formatClearResult(result, targetUserId = null, deleteAfterSeconds = 6) 
     const target = targetUserId ? '成員 <@' + targetUserId + '> 的' : '';
     let content = '🧹 清理完成！實際刪除了' + target + ' **' + result.deleted + '** 則訊息。';
 
+    if (result.skippedBot) content += '\n🤖 已保留銀喵自己發出的 ' + result.skippedBot + ' 則訊息。';
     if (result.skippedPinned) content += '\n📌 跳過 ' + result.skippedPinned + ' 則釘選訊息。';
     if (result.skippedOld) content += '\n⏭️ 跳過 ' + result.skippedOld + ' 則接近或超過 14 天的訊息。';
     if (result.skippedUndeletable) content += '\n🔒 跳過 ' + result.skippedUndeletable + ' 則不可刪除的訊息。';

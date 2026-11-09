@@ -37,7 +37,7 @@ module.exports = {
                 targetUserId = match[1];
             }
 
-            await checkClearPermissions(
+            const botUserId = await checkClearPermissions(
                 message.guild, message.channel, message.member?.permissions
             );
 
@@ -55,7 +55,7 @@ module.exports = {
 
             const stats = await clearChannelMessages({
                 channel: message.channel,
-                amount, targetUserId,
+                amount, targetUserId, botUserId,
                 excludeMessageId: message.id
             });
             text = formatClearResult(stats, targetUserId);

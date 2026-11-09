@@ -13,18 +13,17 @@ module.exports = {
                 .setMinValue(1)
                 .setMaxValue(100)
         )
+        .addUserOption(option =>
+            option.setName('user')
+                .setNameLocalization('zh-TW', '成員')
+                .setDescription('只刪除指定成員在範圍內的訊息（選填）')
+                .setRequired(false)
+        )
         .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages),
 
-    async execute(message, args, client) {
-        // 兼容處理：同時支援 Slash Command (interaction) 或直接呼叫
-        // 如果是透過 InteractionCreate 觸發，會帶入 interaction 物件作為第一個參數
-        const interaction = message;
-        
-        if (!interaction.isChatInputCommand || !interaction.isChatInputCommand()) {
-            return;
-        }
-
+    async execute(interaction) {
         const amount = interaction.options.getInteger('amount');
+        const targetUser = interaction.options.getUser('user');
 
         try {
             await interaction.deferReply({ flags: [MessageFlags.Ephemeral] });
@@ -38,19 +37,40 @@ module.exports = {
                 return;
             }
 
-            if (!interaction.channel || !interaction.channel.bulkDelete) {
+            if (!interaction.channel || !interaction.channel.messages) {
                 await interaction.editReply({ content: '❌ 此頻道無法執行訊息清理喵！' });
                 return;
             }
 
-            // 抓取並刪除訊息 (amount + 1 包含指令本身，透過 bulkDelete 自動過濾超過 14 天的舊訊息)
-            const deleted = await interaction.channel.bulkDelete(amount + 1, true).catch(() => null);
-            
-            const deletedCount = deleted ? Math.max(0, deleted.size - 1) : 0;
+            // 抓取訊息（額外多抓一些以供篩選使用者，上限 100）
+            const fetchLimit = Math.min(amount + (targetUser ? 20 : 0), 100);
+            const messages = await interaction.channel.messages.fetch({ limit: fetchLimit });
 
-            const replyMsg = await interaction.editReply({
-                content: `✅ 成功刪除 **${deletedCount}** 則訊息喵！\n（此提示將於 6 秒後自動刪除）`
-            });
+            let matchedMessages = messages.filter(msg => !msg.pinned);
+
+            if (targetUser) {
+                matchedMessages = matchedMessages.filter(msg => msg.author.id === targetUser.id);
+            }
+
+            // 取出符合指定數量的訊息
+            const targetMessages = Array.from(matchedMessages.values()).slice(0, amount);
+
+            let deletedCount = 0;
+            if (targetMessages.length === 1) {
+                await targetMessages[0].delete();
+                deletedCount = 1;
+            } else if (targetMessages.length >= 2) {
+                const deleted = await interaction.channel.bulkDelete(targetMessages, true).catch(() => null);
+                deletedCount = deleted ? deleted.size : 0;
+            }
+
+            let replyText = targetUser 
+                ? `🧹 成功刪除成員 ${targetUser} 的 **${deletedCount}** 則訊息喵！`
+                : `🧹 成功刪除 **${deletedCount}** 則訊息喵！`;
+
+            replyText += '\n（此提示將於 6 秒後自動刪除）';
+
+            const replyMsg = await interaction.editReply({ content: replyText });
 
             setTimeout(() => {
                 replyMsg.delete().catch(() => {});
@@ -60,11 +80,10 @@ module.exports = {
             if (error.code === 10008 || error.code === 10062) return;
 
             try {
-                await interaction.editReply({
+                const errMsg = await interaction.editReply({
                     content: '❌ 清理訊息時發生錯誤，請確認 Bot 權限喵！\n（此提示將於 6 秒後自動刪除）'
-                }).then(msg => {
-                    setTimeout(() => msg.delete().catch(() => {}), 6000);
                 });
+                setTimeout(() => errMsg.delete().catch(() => {}), 6000);
             } catch (e) {
                 // 靜默略過
             }

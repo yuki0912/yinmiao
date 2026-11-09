@@ -62,7 +62,6 @@ const PendingRole = require('./models/PendingRole');
 const ReactionRole = require('./models/ReactionRole');
 
 // --- 3. Express 中間件與 Session ---
-// 網站管理 API 與前端位於同一網域，不開放任意跨網域讀取。
 app.disable('x-powered-by');
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
@@ -70,7 +69,6 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// 雲端反向代理（如 Nginx, Render, Heroku, Cloudflare）判斷 HTTPS 必備
 app.set('trust proxy', 1);
 
 app.use(session({
@@ -85,14 +83,12 @@ app.use(session({
     cookie: {
         maxAge: 1000 * 60 * 60 * 24, // 1天
         httpOnly: true,
-        secure: isProduction,       // Render 正式環境使用 HTTPS，本地開發使用 HTTP
-        sameSite: 'lax'            // Discord OAuth2 透過頂層 GET callback，可安全使用 Lax
+        secure: isProduction,
+        sameSite: 'lax'
     }
 }));
 
-// 🐾 全域網域與協定判斷工具（自動適應 本地/雲端）
 function getBaseUrl(req) {
-    // Express 僅信任一層反向代理，避免直接使用可能被偽造的 X-Forwarded-Proto。
     return `${req.protocol}://${req.get('host')}`;
 }
 
@@ -103,8 +99,6 @@ function getRedirectUri(req) {
     return `${getBaseUrl(req)}/auth/callback`;
 }
 
-// 後台所有寫入 API 均由同源頁面的 fetch() 呼叫，不允許跨站請求。
-// 瀏覽器 POST 會提供 Origin；少數情況以 Referer 作為備援。
 app.use((req, res, next) => {
     if (!['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) return next();
 
@@ -128,7 +122,6 @@ app.use((req, res, next) => {
     next();
 });
 
-// --- 🐾 全域社群分享設定中間件 (OG Meta Data) ---
 app.use((req, res, next) => {
     const fullUrl = `${getBaseUrl(req)}${req.originalUrl}`;
     const currentAvatar = client.user ? client.user.displayAvatarURL({ size: 512, extension: 'png' }) : 'https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/512x512/1f431.png';
@@ -145,7 +138,6 @@ app.use((req, res, next) => {
     next();
 });
 
-// --- 4. OAuth2 工具與登入驗證中間件 ---
 const oauth = new OAuth2({
     clientId: process.env.CLIENT_ID,
     clientSecret: process.env.CLIENT_SECRET
@@ -154,21 +146,6 @@ const oauth = new OAuth2({
 function checkAuth(req, res, next) {
     if (!req.session.user) return res.redirect('/login');
     next();
-}
-
-// 🐾 變數替換輔助函式（防止未載入完整 Member 物件時崩潰）
-function parsePreviewText(text, member, guild) {
-    if (!text) return '';
-    const userId = member?.id || member?.user?.id || '';
-    const username = member?.user?.username || member?.displayName || '使用者';
-    const guildName = guild?.name || '伺服器';
-    const memberCount = guild?.memberCount || 0;
-
-    return text
-        .replace(/{user}/g, userId ? `<@${userId}>` : username)
-        .replace(/{username}/g, username)
-        .replace(/{server}/g, guildName)
-        .replace(/{count}/g, memberCount.toString());
 }
 
 // --- 5. 核心同步功能 ---
@@ -225,10 +202,9 @@ async function syncRulesMessage(guildId) {
 
         if (targetMsg) {
             if (targetMsg.author.id === client.user.id) {
-                await targetMsg.edit({ embeds: [ruleEmbed] }).catch(console.error);
+                await targetMsg.edit({ embeds: [ruleEmbed] }).catch(() => {});
             }
             await targetMsg.react(targetEmoji).catch(() => { });
-            console.log(`✨ [${guild.name}] 已成功同步更新規則訊息 ID: ${targetMsg.id}`);
             return;
         }
 
@@ -238,11 +214,10 @@ async function syncRulesMessage(guildId) {
                 await sentMsg.react(targetEmoji).catch(() => { });
                 config.rulesMessageId = sentMsg.id;
                 await config.save();
-                console.log(`✨ [${guild.name}] 已發送新規則訊息 ID: ${sentMsg.id}`);
             }
         }
     } catch (err) {
-        console.error("❌ 同步規則訊息出錯:", err);
+        // 靜默略過
     }
 }
 
@@ -273,10 +248,10 @@ async function syncTicketMessage(guildId) {
                 new ButtonBuilder().setCustomId('create_ticket').setLabel('建立工單').setEmoji('🎫').setStyle(ButtonStyle.Primary)
             );
 
-            await targetMsg.edit({ embeds: [embed], components: [row] }).catch(console.error);
+            await targetMsg.edit({ embeds: [embed], components: [row] }).catch(() => {});
         }
     } catch (err) {
-        console.error("❌ 自動同步工單訊息出錯:", err);
+        // 靜默略過
     }
 }
 
@@ -289,7 +264,6 @@ app.get('/', (req, res) => {
     });
 });
 
-// 以隨機 state 綁定 OAuth2 登入請求與同一個 Session，避免登入 CSRF。
 app.get('/login', (req, res) => {
     const redirectUri = getRedirectUri(req);
     const state = crypto.randomBytes(32).toString('hex');
@@ -303,23 +277,19 @@ app.get('/login', (req, res) => {
         state
     });
 
-    // 確認 Session 已寫入 MongoDB 後才跳轉，避免 callback 找不到 state。
     req.session.save(error => {
         if (error) {
-            console.error('[OAuth2] 無法保存登入 Session:', error);
             return res.status(500).send('登入暫時無法使用，請稍後再試。');
         }
         res.redirect(url);
     });
 });
 
-// 相容有無結尾斜線的路徑。
 app.get(['/auth/callback', '/auth/callback/'], async (req, res) => {
     const receivedState = typeof req.query.state === 'string' ? req.query.state : '';
     const expectedState = req.session?.discordOAuthState;
     const expiresAt = req.session?.discordOAuthExpiresAt || 0;
 
-    // state 只能使用一次，並使用固定時間比較函數。
     delete req.session.discordOAuthState;
     delete req.session.discordOAuthExpiresAt;
 
@@ -330,7 +300,6 @@ app.get(['/auth/callback', '/auth/callback/'], async (req, res) => {
         && crypto.timingSafeEqual(Buffer.from(receivedState, 'hex'), Buffer.from(expectedState, 'hex'));
 
     if (!validState) {
-        console.warn('[OAuth2] state 不符或已過期，拒絕登入回呼。');
         return res.status(403).send('登入驗證已過期，請返回首頁後重新登入。');
     }
 
@@ -348,7 +317,6 @@ app.get(['/auth/callback', '/auth/callback/'], async (req, res) => {
         const user = await oauth.getUser(tokenData.access_token);
         const guilds = await oauth.getUserGuilds(tokenData.access_token);
 
-        // 登入成功時更新 Session ID，避免 Session Fixation。
         await new Promise((resolve, reject) => {
             req.session.regenerate(error => error ? reject(error) : resolve());
         });
@@ -360,7 +328,6 @@ app.get(['/auth/callback', '/auth/callback/'], async (req, res) => {
         });
         res.redirect('/dashboard');
     } catch (err) {
-        console.error('[OAuth2] 登入失敗:', err.message);
         res.status(500).send('認證失敗，請重新登入。');
     }
 });
@@ -455,7 +422,6 @@ app.get('/manage/:guildId/reaction-role', checkAuth, async (req, res) => {
             pageTitle: '反應身分組設定', botName: BOT_NAME, user: req.session.user, guildId, guildName: guild.name, channels, roles, configs
         });
     } catch (err) {
-        console.error("載入反應身分組頁面錯誤:", err);
         res.status(500).send("載入網頁時出錯了喵...");
     }
 });
@@ -494,7 +460,6 @@ app.get('/manage/:guildId/embed', checkAuth, async (req, res) => {
             channels
         });
     } catch (err) {
-        console.error("載入 Embed 廣播頁面錯誤:", err);
         res.status(500).send("載入網頁時出錯了喵...");
     }
 });
@@ -652,7 +617,6 @@ app.post('/api/save-config', async (req, res) => {
 
         res.json({ status: 'success', message: '✅ 設定已成功同步至資料庫與 Discord 囉喵！🐾' });
     } catch (err) {
-        console.error(err);
         res.status(500).json({ status: 'error', message: '內部錯誤。' });
     }
 });
@@ -752,7 +716,6 @@ app.post('/api/send-embed', async (req, res) => {
         res.json({ status: 'success', message: '✅ Embed 卡片已成功發送至指定頻道囉喵！🐾' });
 
     } catch (err) {
-        console.error("網頁發送 Embed 卡片失敗:", err);
         res.status(500).json({ status: 'error', message: `發送失敗：${err.message}` });
     }
 });
@@ -767,7 +730,6 @@ app.post('/api/delete-reaction-role', async (req, res) => {
         await ReactionRole.deleteMany({ guildId, messageId });
         res.json({ status: 'success', message: '反應身分組配置已成功移除喵！🐾' });
     } catch (err) {
-        console.error("刪除反應身分組出錯:", err);
         res.status(500).json({ status: 'error', message: err.message });
     }
 });
@@ -778,7 +740,6 @@ app.get('/logout', (req, res) => { req.session.destroy(() => res.redirect('/'));
 const commandLoadErrors = [];
 function loadAllCommands(baseDir, collection) {
     if (!fs.existsSync(baseDir)) {
-        console.warn('[CommandLoader] 指令目錄不存在:', baseDir);
         return;
     }
 
@@ -796,13 +757,11 @@ function loadAllCommands(baseDir, collection) {
                     throw new Error('缺少有效的指令名稱或執行函數');
                 }
                 if (collection.has(commandName)) {
-                    console.warn('[CommandLoader] 重複的指令名稱，略過:', commandName, filePath);
                     continue;
                 }
                 collection.set(commandName, command);
             } catch (error) {
                 commandLoadErrors.push(filePath);
-                console.error('[CommandLoader] 指令載入失敗:', filePath, error);
             }
         }
     }
@@ -836,8 +795,6 @@ function loadHandlers() {
                 }
 
                 Promise.resolve(execution).catch(async error => {
-                    console.error('[EventHandlerError] ' + file + ' (' + event.name + '):', error);
-
                     if (event.name !== Events.InteractionCreate) return;
 
                     const interaction = args[0];
@@ -863,7 +820,7 @@ function loadHandlers() {
                             await interaction.reply(response);
                         }
                     } catch (replyError) {
-                        console.error('[InteractionFallbackError] ' + file + ':', replyError);
+                        // 靜默略過
                     }
                 });
             };
@@ -875,24 +832,20 @@ function loadHandlers() {
             }
 
         } catch (error) {
-            console.error('[EventHandlerRequireError] ' + file + ':', error);
+            // 靜默略過
         }
     }
 }
 
 async function startServer() {
     try {
-        console.log('⏳ 正在連接資料庫...');
         await mongooseConnectionPromise;
-        console.log('✅ 資料庫連接成功！');
 
         loadHandlers();
         loadAllCommands(path.join(__dirname, 'commands/slash'), client.slashCommands);
         loadAllCommands(path.join(__dirname, 'commands/prefix'), client.prefixCommands);
 
-        app.listen(PORT, '0.0.0.0', () => {
-            console.log(`🌐 網頁伺服器已啟動: http://localhost:${PORT}`);
-        });
+        app.listen(PORT, '0.0.0.0', () => {});
 
         client.once(Events.ClientReady, async () => {
             try {
@@ -901,33 +854,24 @@ async function startServer() {
                     .filter(c => c && c.data && typeof c.data.toJSON === 'function')
                     .map(c => c.data.toJSON());
 
-                if (commandLoadErrors.length > 0) {
-                    // 避免載入部分指令失敗時，覆蓋 Discord 全域指令而造成原有指令消失。
-                    console.error('[CommandLoader] 有 ' + commandLoadErrors.length + ' 個指令未能載入，略過本次全域同步。');
-                } else {
+                if (commandLoadErrors.length === 0) {
                     await rest.put(Routes.applicationCommands(process.env.CLIENT_ID), { body: slashCommandsData });
-                    console.log('✅ 斜線指令(Slash Commands)已成功同步至 Discord 全域！');
                 }
             } catch (restErr) {
-                console.error('⚠️ 同步斜線指令時發生錯誤:', restErr);
+                // 靜默略過
             }
-
-            console.log(`✅ 銀喵機器人 (${client.user.tag}) 準備就緒喵！🐾`);
         });
 
-        console.log('⏳ 正在登入 Discord Bot...');
         await client.login(process.env.DISCORD_TOKEN);
 
     } catch (err) {
-        console.error('💥 系統啟動失敗:', err);
         process.exit(1);
     }
 }
 
 startServer();
 
-process.on('unhandledRejection', (reason) => { console.error('⚠️ 未處理的非同步拒絕:', reason); });
-process.on('uncaughtException', (err) => {
-    console.error('💥 未捕獲的嚴重例外，將退出以避免程序處於不可預期狀態:', err);
+process.on('unhandledRejection', () => {});
+process.on('uncaughtException', () => {
     process.exit(1);
 });

@@ -324,10 +324,10 @@ app.get(['/auth/callback', '/auth/callback/'], async (req, res) => {
     delete req.session.discordOAuthExpiresAt;
 
     const validState = typeof expectedState === 'string'
-        && receivedState.length === expectedState.length
-        && receivedState.length === 64
+        && /^[a-f0-9]{64}$/.test(expectedState)
+        && /^[a-f0-9]{64}$/.test(receivedState)
         && Date.now() < expiresAt
-        && crypto.timingSafeEqual(Buffer.from(receivedState), Buffer.from(expectedState));
+        && crypto.timingSafeEqual(Buffer.from(receivedState, 'hex'), Buffer.from(expectedState, 'hex'));
 
     if (!validState) {
         console.warn('[OAuth2] state 不符或已過期，拒絕登入回呼。');

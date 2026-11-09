@@ -26,23 +26,20 @@ module.exports = {
         const targetUser = interaction.options.getUser('user');
 
         try {
-            await interaction.deferReply({ flags: [MessageFlags.Ephemeral] });
-        } catch (error) {
-            return;
-        }
-
-        try {
             if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageMessages)) {
-                await interaction.editReply({ content: '❌ 你沒有「管理訊息」權限喵！' });
-                return;
+                return await interaction.reply({
+                    content: '❌ 你沒有「管理訊息」權限',
+                    flags: [MessageFlags.Ephemeral]
+                });
             }
 
             if (!interaction.channel || !interaction.channel.messages) {
-                await interaction.editReply({ content: '❌ 此頻道無法執行訊息清理喵！' });
-                return;
+                return await interaction.reply({
+                    content: '❌ 此頻道無法執行訊息清理',
+                    flags: [MessageFlags.Ephemeral]
+                });
             }
 
-            // 抓取訊息（額外多抓一些以供篩選使用者，上限 100）
             const fetchLimit = Math.min(amount + (targetUser ? 20 : 0), 100);
             const messages = await interaction.channel.messages.fetch({ limit: fetchLimit });
 
@@ -52,7 +49,6 @@ module.exports = {
                 matchedMessages = matchedMessages.filter(msg => msg.author.id === targetUser.id);
             }
 
-            // 取出符合指定數量的訊息
             const targetMessages = Array.from(matchedMessages.values()).slice(0, amount);
 
             let deletedCount = 0;
@@ -64,13 +60,11 @@ module.exports = {
                 deletedCount = deleted ? deleted.size : 0;
             }
 
-            let replyText = targetUser 
-                ? `🧹 成功刪除成員 ${targetUser} 的 **${deletedCount}** 則訊息喵！`
-                : `🧹 成功刪除 **${deletedCount}** 則訊息喵！`;
-
-            replyText += '\n（此提示將於 6 秒後自動刪除）';
-
-            const replyMsg = await interaction.editReply({ content: replyText });
+            const replyMsg = await interaction.reply({
+                content: `已刪除 ${deletedCount} 則訊息`,
+                flags: [MessageFlags.Ephemeral],
+                fetchReply: true
+            });
 
             setTimeout(() => {
                 replyMsg.delete().catch(() => {});
@@ -80,8 +74,10 @@ module.exports = {
             if (error.code === 10008 || error.code === 10062) return;
 
             try {
-                const errMsg = await interaction.editReply({
-                    content: '❌ 清理訊息時發生錯誤，請確認 Bot 權限喵！\n（此提示將於 6 秒後自動刪除）'
+                const errMsg = await interaction.reply({
+                    content: `已刪除 0 則訊息`,
+                    flags: [MessageFlags.Ephemeral],
+                    fetchReply: true
                 });
                 setTimeout(() => errMsg.delete().catch(() => {}), 6000);
             } catch (e) {

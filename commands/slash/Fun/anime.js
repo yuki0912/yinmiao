@@ -36,7 +36,7 @@ module.exports = {
     category: 'Fun',
     data: new SlashCommandBuilder()
         .setName('anime')
-        .setDescription('使用 random-anime 取得隨機動漫圖片'),
+        .setDescription('取得隨機動漫圖片'),
 
     async execute(interaction) {
         try {
@@ -54,9 +54,8 @@ module.exports = {
             const embed = new EmbedBuilder()
                 .setTitle('🎌 隨機動漫圖片')
                 .setURL(imageUrl)
-                .setDescription('如果圖片沒有顯示，可點擊標題開啟原圖。')
                 .setImage(imageUrl)
-                .setColor('#F2A9B4')
+                .setColor('Random')
                 .setFooter({
                     text: '由 ' + (user.tag || user.username) + ' 請求',
                     iconURL: user.displayAvatarURL({ extension: 'png', size: 128 })

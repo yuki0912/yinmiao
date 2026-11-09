@@ -38,81 +38,124 @@ async function checkClearPermissions(guild, channel, memberPermissions) {
     return botMember.id;
 }
 
-// amount 表示「檢查最近 N 則非指令訊息」，不是無限制向前翻找符合條件的訊息。
-async function fetchRecentMessages(channel, amount, excludeMessageId = null) {
-    const messages = await channel.messages.fetch({
-        limit: Math.min(100, amount + (excludeMessageId ? 1 : 0))
-    });
-    const result = new Collection();
-
-    for (const [id, message] of messages) {
-        if (id !== excludeMessageId && result.size < amount) result.set(id, message);
-    }
-
-    // 100 則上限下，如果仍抓到前綴指令本身，向前再補抓最多一則。
-    if (excludeMessageId && messages.has(excludeMessageId) &&
-        result.size < amount && messages.size === 100) {
-        const oldest = messages.last();
-        if (oldest) {
-            const older = await channel.messages.fetch({
-                limit: Math.min(100, amount - result.size),
-                before: oldest.id
-            });
-            for (const [id, message] of older) {
-                if (id !== excludeMessageId && result.size < amount) result.set(id, message);
-            }
-        }
-    }
-
-    return result;
-}
+// amount 是「最多實際刪除 N 則訊息」，而不是只檢查最新 N 則。
+// 向前翻頁找可清理的訊息，避免最新訊息都是銀喵發出時刪除 0 則。
+const MAX_SCAN_MESSAGES = 1000;
 
 async function clearChannelMessages({
     channel, amount, targetUserId = null, excludeMessageId = null, botUserId
 }) {
-    // 如果無法識別銀喵的 ID，不冒險執行批次刪除。
     if (!botUserId) throw new Error('CLEAR_BOT_PERMISSION');
-
-    const messages = await fetchRecentMessages(channel, amount, excludeMessageId);
-    const selected = messages.filter(m => !targetUserId || m.author?.id === targetUserId);
-
-    // 保護銀喵的所有訊息，包括正在回應的 /clear 公開訊息。
-    const skippedBot = selected.filter(m => m.author?.id === botUserId).size;
-    const otherMessages = selected.filter(m => m.author?.id !== botUserId);
-    const skippedPinned = otherMessages.filter(m => m.pinned).size;
-    const unpinned = otherMessages.filter(m => !m.pinned);
+    const candidates = new Collection();
     const cutoff = Date.now() - TWO_WEEKS_MS + AGE_MARGIN_MS;
-    const skippedOld = unpinned.filter(m => m.createdTimestamp <= cutoff).size;
-    const recent = unpinned.filter(m => m.createdTimestamp > cutoff);
-    const skippedUndeletable = recent.filter(m => m.deletable === false).size;
-    const eligible = recent.filter(m => m.deletable !== false);
+    const limitPerPage = Math.min(100, Math.max(25, amount + 20));
+
+    let scanned = 0;
+    let matched = 0;
+    let skippedBot = 0;
+    let skippedPinned = 0;
+    let skippedOld = 0;
+    let skippedUndeletable = 0;
+    let before;
+    let stoppedAtOldMessage = false;
+
+    while (candidates.size < amount && scanned < MAX_SCAN_MESSAGES) {
+        const limit = Math.min(limitPerPage, MAX_SCAN_MESSAGES - scanned);
+        const query = { limit };
+        if (before) query.before = before;
+
+        const page = await channel.messages.fetch(query);
+        if (!page?.size) break;
+
+        scanned += page.size;
+        const oldestMessage = page.last();
+
+        for (const [id, message] of page) {
+            if (id === excludeMessageId) continue;
+
+            // 訊息由新到舊排序；遇到超過 14 天的訊息即可停止搜尋。
+            if (message.createdTimestamp <= cutoff) {
+                stoppedAtOldMessage = true;
+                if (!targetUserId || message.author?.id === targetUserId) skippedOld++;
+                break;
+            }
+
+            if (targetUserId && message.author?.id !== targetUserId) continue;
+            matched++;
+
+            if (message.author?.id === botUserId) {
+                skippedBot++;
+                continue;
+            }
+            if (message.pinned) {
+                skippedPinned++;
+                continue;
+            }
+            if (message.deletable === false) {
+                skippedUndeletable++;
+                continue;
+            }
+
+            candidates.set(id, message);
+            if (candidates.size >= amount) break;
+        }
+
+        if (stoppedAtOldMessage || candidates.size >= amount || page.size < limit) break;
+        if (!oldestMessage?.id || oldestMessage.id === before) break;
+
+        before = oldestMessage.id;
+    }
 
     let deleted = 0;
     let disappeared = 0;
-    if (eligible.size === 1) {
+
+    if (candidates.size === 1) {
         try {
-            await eligible.first().delete();
+            await candidates.first().delete();
             deleted = 1;
         } catch (error) {
             if (error.code !== 10008) throw error;
             disappeared = 1;
         }
-    } else if (eligible.size > 1) {
-        // Discord 的 bulkDelete 回傳成功刪除的 Collection；不能用請求量代替結果。
-        const removed = await channel.bulkDelete(eligible, true);
-        deleted = removed.size;
-        disappeared = Math.max(0, eligible.size - deleted);
+    } else if (candidates.size > 1) {
+        const removed = await channel.bulkDelete(candidates, true);
+        deleted = Array.isArray(removed) ? removed.length : removed?.size;
+        if (!Number.isInteger(deleted)) {
+            throw new Error('CLEAR_UNKNOWN_DELETE_RESULT');
+        }
+        disappeared = Math.max(0, candidates.size - deleted);
     }
 
     return {
-        requested: amount, inspected: messages.size, matched: selected.size, deleted,
-        skippedBot, skippedPinned, skippedOld, skippedUndeletable, disappeared
+        requested: amount,
+        inspected: scanned,
+        matched,
+        deleted,
+        skippedBot,
+        skippedPinned,
+        skippedOld,
+        skippedUndeletable,
+        disappeared,
+        scanLimitReached: scanned >= MAX_SCAN_MESSAGES && candidates.size < amount,
+        stoppedAtOldMessage
     };
 }
 
 function formatClearResult(result, targetUserId = null, deleteAfterSeconds = 6) {
     const target = targetUserId ? '成員 <@' + targetUserId + '> 的' : '';
-    let content = '🧹 清理完成！實際刪除了' + target + ' **' + result.deleted + '** 則訊息。';
+    let content = result.deleted
+        ? '🧹 清理完成！實際刪除了' + target + ' **' + result.deleted + '** 則訊息。'
+        : '🧹 沒有找到可刪除的訊息，實際刪除 **0** 則。';
+
+    if (!result.deleted) {
+        if (!result.inspected) {
+            content += '\nℹ️ 頻道內沒有可供檢查的訊息。';
+        } else if (targetUserId && !result.matched) {
+            content += '\nℹ️ 搜尋範圍內沒有找到指定成員近期可刪除的訊息。';
+        } else if (result.skippedBot && !result.skippedPinned && !result.skippedUndeletable) {
+            content += '\nℹ️ 最近的訊息主要由銀喵發出，因此已保留。';
+        }
+    }
 
     if (result.skippedBot) content += '\n🤖 已保留銀喵自己發出的 ' + result.skippedBot + ' 則訊息。';
     if (result.skippedPinned) content += '\n📌 跳過 ' + result.skippedPinned + ' 則釘選訊息。';
@@ -120,6 +163,9 @@ function formatClearResult(result, targetUserId = null, deleteAfterSeconds = 6) 
     if (result.skippedUndeletable) content += '\n🔒 跳過 ' + result.skippedUndeletable + ' 則不可刪除的訊息。';
     if (result.disappeared) content += '\nℹ️ ' + result.disappeared + ' 則訊息可能已被其他操作刪除，未計入數量。';
 
+    if (result.scanLimitReached) {
+        content += '\n🔎 已搜尋最多 1000 則歷史訊息，未繼續向前清理。';
+    }
     return content + '\n（此提示將於 ' + deleteAfterSeconds + ' 秒後自動刪除）';
 }
 

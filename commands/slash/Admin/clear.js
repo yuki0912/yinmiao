@@ -60,7 +60,7 @@ module.exports = {
         .setDescription('清理頻道訊息（公開顯示數量，5 秒後自動刪除提示）')
         .addIntegerOption(opt => opt.setName('amount')
             .setNameLocalization('zh-TW', '數量')
-            .setDescription('要檢查的最近訊息數量 (1-100)')
+            .setDescription('希望刪除的訊息數量 (1-100)')
             .setRequired(true).setMinValue(1).setMaxValue(100))
         .addUserOption(opt => opt.setName('user')
             .setNameLocalization('zh-TW', '成員')
@@ -96,19 +96,10 @@ module.exports = {
                 interaction.guild, interaction.channel, interaction.memberPermissions
             );
 
-            // 公開的「正在回應」也是 Bot 訊息：避免占用最近 N 則的額度。
-            let pendingReplyId = null;
-            try {
-                pendingReplyId = (await interaction.fetchReply())?.id || null;
-            } catch (error) {
-                console.warn('[clear/slash] 無法取得原始回覆 ID，仍會保護銀喵訊息:', error.code);
-            }
-
-            // 共用工具負責：排除銀喵的訊息、釘選訊息、超過 14 天的訊息，
-            // 支援指定成員，並以 Discord 實際回傳的刪除數量計算。
+            // 公開的互動回覆會被過濾為銀喵自身訊息；不用額外 fetchReply。
+            // 共用工具會逐頁找最多 amount 則可清理的其他成員訊息。
             const summary = await clearChannelMessages({
-                channel: interaction.channel, amount, targetUserId,
-                botUserId, excludeMessageId: pendingReplyId
+                channel: interaction.channel, amount, targetUserId, botUserId
             });
 
             result = formatClearResult(summary, targetUserId, 5);

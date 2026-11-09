@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, PermissionFlagsBits, MessageFlags } = require('discord.js');
+const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
 
 module.exports = {
     category: 'Admin',
@@ -29,14 +29,14 @@ module.exports = {
             if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageMessages)) {
                 return await interaction.reply({
                     content: '❌ 你沒有「管理訊息」權限',
-                    flags: [MessageFlags.Ephemeral]
+                    ephemeral: true
                 });
             }
 
             if (!interaction.channel || !interaction.channel.messages) {
                 return await interaction.reply({
                     content: '❌ 此頻道無法執行訊息清理',
-                    flags: [MessageFlags.Ephemeral]
+                    ephemeral: true
                 });
             }
 
@@ -60,9 +60,9 @@ module.exports = {
                 deletedCount = deleted ? deleted.size : 0;
             }
 
+            // 公開回覆（未設定 ephemeral），並在 6 秒後自動刪除
             const replyMsg = await interaction.reply({
                 content: `已刪除 ${deletedCount} 則訊息`,
-                flags: [MessageFlags.Ephemeral],
                 fetchReply: true
             });
 
@@ -76,7 +76,6 @@ module.exports = {
             try {
                 const errMsg = await interaction.reply({
                     content: `已刪除 0 則訊息`,
-                    flags: [MessageFlags.Ephemeral],
                     fetchReply: true
                 });
                 setTimeout(() => errMsg.delete().catch(() => {}), 6000);

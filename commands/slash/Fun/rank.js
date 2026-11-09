@@ -13,7 +13,7 @@ if (fs.existsSync(fontPath)) {
         GlobalFonts.registerFromPath(fontPath, 'YinMiaoRank');
         fontFamily = 'YinMiaoRank';
     } catch (error) {
-        console.warn('[rank] 無法載入中文字型，改用系統字型:', error.message);
+        // 靜默略過字型註冊警告
     }
 }
 
@@ -80,7 +80,6 @@ function drawCard(ctx, data) {
 
     ctx.clearRect(0, 0, W, H);
 
-    // 左側冒險者檔案：深藍漸層、細格紋、日系遊戲的裝飾邊角。
     const bg = ctx.createLinearGradient(0, 0, 690, 330);
     bg.addColorStop(0, '#122438');
     bg.addColorStop(0.6, '#18283B');
@@ -107,7 +106,6 @@ function drawCard(ctx, data) {
     ctx.fillStyle = glow;
     ctx.fillRect(0, 0, 500, 330);
 
-    // 標題和徽章
     ctx.fillStyle = colors.gold;
     ctx.textAlign = 'left';
     ctx.font = 'bold 17px ' + fontFamily;
@@ -134,7 +132,6 @@ function drawCard(ctx, data) {
     drawCorner(ctx, 23, 23, 1, 1, 'rgba(245,214,158,0.7)');
     drawCorner(ctx, 667, 307, -1, -1, 'rgba(245,214,158,0.7)');
 
-    // 角色頭像外框，保留 Discord 真實頭像。
     ctx.strokeStyle = colors.gold;
     ctx.lineWidth = 4;
     ctx.beginPath();
@@ -162,7 +159,6 @@ function drawCard(ctx, data) {
     }
     ctx.restore();
 
-    // 名稱與永久資料說明。
     ctx.textAlign = 'left';
     ctx.fillStyle = colors.white;
     ctx.font = 'bold 34px ' + fontFamily;
@@ -175,12 +171,10 @@ function drawCard(ctx, data) {
     ctx.font = '12px ' + fontFamily;
     ctx.fillText(data.guildName, 216, 179, 400);
 
-    // 三個長期數據：不再使用「每週」排名或每週經驗值。
     drawStat(ctx, 215, '伺服器排名', data.serverRank, colors.gold);
     drawStat(ctx, 363, '累積 EXP', data.totalXpText, colors.ice);
     drawStat(ctx, 511, '距離下一級', data.remainingText, colors.pink);
 
-    // 底部主進度條。
     ctx.fillStyle = colors.muted;
     ctx.font = 'bold 11px ' + fontFamily;
     ctx.fillText('LEVEL PROGRESS', 37, 310);
@@ -196,7 +190,6 @@ function drawCard(ctx, data) {
 
     ctx.restore();
 
-    // 右上：等級面板。
     const levelBg = ctx.createLinearGradient(710, 0, 1000, 155);
     levelBg.addColorStop(0, '#1B3147');
     levelBg.addColorStop(1, '#101F32');
@@ -217,7 +210,6 @@ function drawCard(ctx, data) {
     ctx.font = 'bold 53px ' + fontFamily;
     ctx.fillText(String(data.level), 855, 116, 214);
 
-    // 右下：目前等級內的 EXP，與累積 XP 分開顯示。
     const expBg = ctx.createLinearGradient(710, 175, 1000, 330);
     expBg.addColorStop(0, '#1B3147');
     expBg.addColorStop(1, '#101F32');
@@ -264,12 +256,13 @@ module.exports = {
         .addUserOption(option => option.setName('user').setDescription('要查看的成員')),
 
     async execute(interaction) {
-        await interaction.deferReply();
+        if (!interaction.deferred && !interaction.replied) {
+            await interaction.deferReply();
+        }
 
         try {
             if (!interaction.guild) {
-                await interaction.editReply({ content: '請在 Discord 伺服器內使用 /rank。' });
-                return;
+                return await interaction.editReply({ content: '請在 Discord 伺服器內使用 /rank 喵。' });
             }
 
             const targetUser = interaction.options.getUser('user') || interaction.user;
@@ -282,7 +275,6 @@ module.exports = {
                 guildId: interaction.guild.id
             });
 
-            // xp 是資料庫永久累積經驗值；不再讀取會被週期清空的 weeklyExp。
             const level = Math.max(1, Math.floor(Number(profile?.level) || 1));
             const totalXp = Math.max(0, Number(profile?.xp) || 0);
             const levelMax = 5 * (level ** 2) + 50 * level + 100;
@@ -298,8 +290,8 @@ module.exports = {
             let avatar = null;
             try {
                 avatar = await loadImage(avatarUrl);
-            } catch (error) {
-                console.warn('[rank] 無法載入 Discord 頭像，使用預設圖案:', error.message);
+            } catch (err) {
+                // 如果頭像載入失敗，保持 null 走備用方案
             }
 
             const canvas = createCanvas(1000, 330);
@@ -320,13 +312,17 @@ module.exports = {
             const attachment = new AttachmentBuilder(canvas.toBuffer('image/png'), {
                 name: 'rank-card.png'
             });
+
             await interaction.editReply({ files: [attachment] });
 
         } catch (error) {
-            console.error('[rank] 讀取 XP 資料或渲染卡片時發生錯誤:', error);
-            await interaction.editReply({
-                content: '❌ 無法產生 XP 卡片，請稍後再試。'
-            }).catch(replyError => console.error('[rank] 回覆失敗:', replyError));
+            try {
+                await interaction.editReply({
+                    content: '❌ 產生 XP 卡片時發生錯誤，請稍後再試喵！'
+                });
+            } catch (e) {
+                // 靜默略過
+            }
         }
     }
 };

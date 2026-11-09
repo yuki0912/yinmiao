@@ -31,9 +31,12 @@ module.exports = {
                 withResponse: true
             });
 
-            setTimeout(() => {
-                interaction.deleteReply().catch(() => {});
-            }, 5000);
+            const replyMessage = response.resource?.message;
+            if (replyMessage) {
+                setTimeout(() => {
+                    replyMessage.delete().catch(() => {});
+                }, 5000);
+            }
 
         } catch (error) {
             // 靜默略過

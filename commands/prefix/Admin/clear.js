@@ -1,42 +1,82 @@
 const { PermissionFlagsBits } = require('discord.js');
+const {
+    REPLY_DELETE_DELAY_MS, parseAmount, checkClearPermissions,
+    clearChannelMessages, formatClearResult, getClearErrorMessage
+} = require('../../../utils/clearMessages');
+
+async function sendTemporary(channel, content) {
+    const reply = await channel.send({
+        content,
+        allowedMentions: { parse: [] }
+    });
+    setTimeout(() => {
+        reply.delete().catch(error => {
+            if (![10008, 10062].includes(error.code)) {
+                console.error('[clear/prefix] 6 秒後刪除提示失敗:', error);
+            }
+        });
+    }, REPLY_DELETE_DELAY_MS);
+}
 
 module.exports = {
     name: 'clear',
     aliases: ['purge', '清除', '🧹'],
     category: 'Admin',
-    description: '清理訊息 (管理員專用)',
-    permissions: [PermissionFlagsBits.ManageMessages],
+    description: '刪除最近訊息：s!clear 10 [@成員]（管理訊息權限、提示 6 秒自動刪除）',
 
-    // 🌟 重點：參數順序一定要是 (message, args, client)
     async execute(message, args, client) {
-        const amount = parseInt(args[0]);
-
-        if (isNaN(amount) || amount < 1 || amount > 100) {
-            // 使用 try-catch 確保訊息還在才刪除
-            const reply = await message.reply('❌ 請輸入要清除的訊息數量 (1-100) 喵。').catch(() => null);
-            if (reply) setTimeout(() => reply.delete().catch(() => null), 3000);
-            return;
-        }
-
+        let text;
         try {
-            // 🌟 修正點：先刪除訊息，再回報結果
-            // 注意：為了避免 Unknown Message 報錯，我們不要在刪除後回覆(reply)
-            // 而是直接在頻道發送(send)
-            
-            // 先嘗試刪除使用者的指令訊息
-            await message.delete().catch(() => null);
+            const amount = parseAmount(args[0]);
+            let targetUserId = null;
 
-            const deleted = await message.channel.bulkDelete(amount, true);
+            if (args.length > 2) throw new Error('CLEAR_INVALID_TARGET');
+            if (args.length === 2) {
+                const match = /^<@!?([0-9]{15,25})>$/.exec(args[1]);
+                if (!match) throw new Error('CLEAR_INVALID_TARGET');
+                targetUserId = match[1];
+            }
 
-            const res = await message.channel.send(`🧹 **銀喵已成功清理 ${deleted.size} 則訊息喵！**`);
-            setTimeout(() => res.delete().catch(() => null), 5000);
+            await checkClearPermissions(
+                message.guild, message.channel, message.member?.permissions
+            );
 
+            // 清除指令訊息本身（不算進使用者要求的 amount）。
+            // 即使訊息已被其他 Bot 刪除，仍可繼續執行清理。
+            let deletedCommand = false;
+            try {
+                await message.delete();
+                deletedCommand = true;
+            } catch (error) {
+                if (error.code !== 10008) {
+                    console.warn('[clear/prefix] 無法刪除指令訊息:', error);
+                }
+            }
+
+            const stats = await clearChannelMessages({
+                channel: message.channel,
+                amount, targetUserId,
+                excludeMessageId: message.id
+            });
+            text = formatClearResult(stats, targetUserId);
+
+            console.log('[clear/prefix] 清理完成:', {
+                guildId: message.guild.id, moderator: message.author.id,
+                commandDeleted: deletedCommand, ...stats
+            });
         } catch (error) {
-            console.error('[Clear Command Error]:', error);
-            // 發生錯誤時，用 send 而不是 reply，防止訊息已被刪除導致的報錯
-            message.channel.send('❌ 清理失敗喵。可能原因：我缺少權限，或是訊息超過 14 天喵。')
-                .then(msg => setTimeout(() => msg.delete().catch(() => null), 5000))
-                .catch(() => null);
+            console.error('[clear/prefix] 清理失敗:', {
+                guildId: message.guild?.id, code: error.code, message: error.message
+            }, error);
+            text = '❌ 清理失敗：' + getClearErrorMessage(error) +
+                '\n（此提示將於 6 秒後自動刪除）';
         }
-    },
+
+        // 不使用 message.reply()：原本的指令訊息可能已被刪除。
+        try {
+            await sendTemporary(message.channel, text);
+        } catch (error) {
+            console.error('[clear/prefix] 無法傳送結果:', error);
+        }
+    }
 };

@@ -8,7 +8,7 @@ const session = require('express-session');
 const MongoStore = require('connect-mongo');
 const mongoose = require('mongoose');
 const OAuth2 = require('discord-oauth2');
-const cors = require('cors');
+const crypto = require('node:crypto');
 const {
     Client,
     Collection,
@@ -29,7 +29,13 @@ const {
 const app = express();
 const PORT = process.env.PORT || 3000;
 const BOT_NAME = '銀喵 YinMiao';
-const isProduction = process.env.NODE_ENV === 'production';
+const isProduction = process.env.NODE_ENV === 'production' || process.env.RENDER === 'true';
+
+// SESSION_SECRET 必須在本機 .env 或 Render Environment 中設定，禁止使用硬編碼預設值。
+const sessionSecret = process.env.SESSION_SECRET;
+if (!sessionSecret || !sessionSecret.trim()) {
+    throw new Error('缺少 SESSION_SECRET 環境變數，請在 .env 或 Render Environment 中設定。');
+}
 
 // 建立共用 Mongoose 連線 Promise，避免 MongoStore 重覆建立連線池
 const mongooseConnectionPromise = mongoose.connect(process.env.MONGODB_URI);
@@ -56,7 +62,8 @@ const PendingRole = require('./models/PendingRole');
 const ReactionRole = require('./models/ReactionRole');
 
 // --- 3. Express 中間件與 Session ---
-app.use(cors());
+// 網站管理 API 與前端位於同一網域，不開放任意跨網域讀取。
+app.disable('x-powered-by');
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
 app.use(express.static(path.join(__dirname, 'public')));
@@ -64,10 +71,10 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // 雲端反向代理（如 Nginx, Render, Heroku, Cloudflare）判斷 HTTPS 必備
-app.set('trust proxy', true);
+app.set('trust proxy', 1);
 
 app.use(session({
-    secret: process.env.SESSION_SECRET || 'yinmiao-secret-cat',
+    secret: sessionSecret,
     resave: false,
     saveUninitialized: false,
     store: MongoStore.create({
@@ -77,15 +84,16 @@ app.use(session({
     }),
     cookie: {
         maxAge: 1000 * 60 * 60 * 24, // 1天
-        secure: isProduction,       // 正式環境使用 HTTPS，本地開發使用 HTTP
-        sameSite: isProduction ? 'none' : 'lax'
+        httpOnly: true,
+        secure: isProduction,       // Render 正式環境使用 HTTPS，本地開發使用 HTTP
+        sameSite: 'lax'            // Discord OAuth2 透過頂層 GET callback，可安全使用 Lax
     }
 }));
 
 // 🐾 全域網域與協定判斷工具（自動適應 本地/雲端）
 function getBaseUrl(req) {
-    const protocol = req.headers['x-forwarded-proto'] || req.protocol;
-    return `${protocol}://${req.get('host')}`;
+    // Express 僅信任一層反向代理，避免直接使用可能被偽造的 X-Forwarded-Proto。
+    return `${req.protocol}://${req.get('host')}`;
 }
 
 function getRedirectUri(req) {
@@ -94,6 +102,31 @@ function getRedirectUri(req) {
     }
     return `${getBaseUrl(req)}/auth/callback`;
 }
+
+// 後台所有寫入 API 均由同源頁面的 fetch() 呼叫，不允許跨站請求。
+// 瀏覽器 POST 會提供 Origin；少數情況以 Referer 作為備援。
+app.use((req, res, next) => {
+    if (!['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) return next();
+
+    const originHeader = req.get('origin');
+    const refererHeader = req.get('referer');
+    let sourceOrigin = originHeader;
+
+    if (!sourceOrigin && refererHeader) {
+        try {
+            sourceOrigin = new URL(refererHeader).origin;
+        } catch {
+            return res.status(403).json({ status: 'error', message: '請求來源無效。' });
+        }
+    }
+
+    const expectedOrigin = new URL(getBaseUrl(req)).origin;
+    if (!sourceOrigin || sourceOrigin !== expectedOrigin) {
+        return res.status(403).json({ status: 'error', message: '禁止跨站修改後台設定。' });
+    }
+
+    next();
+});
 
 // --- 🐾 全域社群分享設定中間件 (OG Meta Data) ---
 app.use((req, res, next) => {
@@ -256,38 +289,79 @@ app.get('/', (req, res) => {
     });
 });
 
+// 以隨機 state 綁定 OAuth2 登入請求與同一個 Session，避免登入 CSRF。
 app.get('/login', (req, res) => {
     const redirectUri = getRedirectUri(req);
+    const state = crypto.randomBytes(32).toString('hex');
+    req.session.discordOAuthState = state;
+    req.session.discordOAuthExpiresAt = Date.now() + 10 * 60 * 1000;
+
     const url = oauth.generateAuthUrl({
-        scope: ["identify", "guilds"],
-        responseType: "code",
-        redirectUri
+        scope: ['identify', 'guilds'],
+        responseType: 'code',
+        redirectUri,
+        state
     });
-    res.redirect(url);
+
+    // 確認 Session 已寫入 MongoDB 後才跳轉，避免 callback 找不到 state。
+    req.session.save(error => {
+        if (error) {
+            console.error('[OAuth2] 無法保存登入 Session:', error);
+            return res.status(500).send('登入暫時無法使用，請稍後再試。');
+        }
+        res.redirect(url);
+    });
 });
 
-// 相容有無結尾斜線的路徑
+// 相容有無結尾斜線的路徑。
 app.get(['/auth/callback', '/auth/callback/'], async (req, res) => {
-    const code = req.query.code;
+    const receivedState = typeof req.query.state === 'string' ? req.query.state : '';
+    const expectedState = req.session?.discordOAuthState;
+    const expiresAt = req.session?.discordOAuthExpiresAt || 0;
+
+    // state 只能使用一次，並使用固定時間比較函數。
+    delete req.session.discordOAuthState;
+    delete req.session.discordOAuthExpiresAt;
+
+    const validState = typeof expectedState === 'string'
+        && receivedState.length === expectedState.length
+        && receivedState.length === 64
+        && Date.now() < expiresAt
+        && crypto.timingSafeEqual(Buffer.from(receivedState), Buffer.from(expectedState));
+
+    if (!validState) {
+        console.warn('[OAuth2] state 不符或已過期，拒絕登入回呼。');
+        return res.status(403).send('登入驗證已過期，請返回首頁後重新登入。');
+    }
+
+    const code = typeof req.query.code === 'string' ? req.query.code : '';
     if (!code) return res.redirect('/');
+
     try {
         const redirectUri = getRedirectUri(req);
         const tokenData = await oauth.tokenRequest({
             code,
-            scope: "identify guilds",
-            grantType: "authorization_code",
+            scope: 'identify guilds',
+            grantType: 'authorization_code',
             redirectUri
         });
         const user = await oauth.getUser(tokenData.access_token);
         const guilds = await oauth.getUserGuilds(tokenData.access_token);
 
+        // 登入成功時更新 Session ID，避免 Session Fixation。
+        await new Promise((resolve, reject) => {
+            req.session.regenerate(error => error ? reject(error) : resolve());
+        });
         req.session.user = user;
         req.session.guilds = guilds.filter(g => g.owner === true || (BigInt(g.permissions) & 8n) === 8n);
 
+        await new Promise((resolve, reject) => {
+            req.session.save(error => error ? reject(error) : resolve());
+        });
         res.redirect('/dashboard');
     } catch (err) {
-        console.error("Auth Error:", err);
-        res.status(500).send("認證失敗喵...");
+        console.error('[OAuth2] 登入失敗:', err.message);
+        res.status(500).send('認證失敗，請重新登入。');
     }
 });
 
@@ -701,16 +775,35 @@ app.post('/api/delete-reaction-role', async (req, res) => {
 app.get('/logout', (req, res) => { req.session.destroy(() => res.redirect('/')); });
 
 // --- 8. 指令載入與服務啟動邏輯 ---
+const commandLoadErrors = [];
 function loadAllCommands(baseDir, collection) {
-    if (!fs.existsSync(baseDir)) return;
+    if (!fs.existsSync(baseDir)) {
+        console.warn('[CommandLoader] 指令目錄不存在:', baseDir);
+        return;
+    }
+
     const files = fs.readdirSync(baseDir, { withFileTypes: true });
     for (const file of files) {
         const filePath = path.join(baseDir, file.name);
-        if (file.isDirectory()) { loadAllCommands(filePath, collection); }
-        else if (file.name.endsWith('.js')) {
-            const command = require(filePath);
-            const commandName = command.data?.name || command.name;
-            if (commandName) collection.set(commandName, command);
+        if (file.isDirectory()) {
+            loadAllCommands(filePath, collection);
+        } else if (file.name.endsWith('.js')) {
+            try {
+                const command = require(filePath);
+                const commandName = command.data?.name || command.name;
+
+                if (!commandName || typeof command.execute !== 'function' && typeof command.run !== 'function') {
+                    throw new Error('缺少有效的指令名稱或執行函數');
+                }
+                if (collection.has(commandName)) {
+                    console.warn('[CommandLoader] 重複的指令名稱，略過:', commandName, filePath);
+                    continue;
+                }
+                collection.set(commandName, command);
+            } catch (error) {
+                commandLoadErrors.push(filePath);
+                console.error('[CommandLoader] 指令載入失敗:', filePath, error);
+            }
         }
     }
 }
@@ -808,8 +901,13 @@ async function startServer() {
                     .filter(c => c && c.data && typeof c.data.toJSON === 'function')
                     .map(c => c.data.toJSON());
 
-                await rest.put(Routes.applicationCommands(process.env.CLIENT_ID), { body: slashCommandsData });
-                console.log('✅ 斜線指令(Slash Commands)已成功同步至 Discord 全域！');
+                if (commandLoadErrors.length > 0) {
+                    // 避免載入部分指令失敗時，覆蓋 Discord 全域指令而造成原有指令消失。
+                    console.error('[CommandLoader] 有 ' + commandLoadErrors.length + ' 個指令未能載入，略過本次全域同步。');
+                } else {
+                    await rest.put(Routes.applicationCommands(process.env.CLIENT_ID), { body: slashCommandsData });
+                    console.log('✅ 斜線指令(Slash Commands)已成功同步至 Discord 全域！');
+                }
             } catch (restErr) {
                 console.error('⚠️ 同步斜線指令時發生錯誤:', restErr);
             }
@@ -829,4 +927,7 @@ async function startServer() {
 startServer();
 
 process.on('unhandledRejection', (reason) => { console.error('⚠️ 未處理的非同步拒絕:', reason); });
-process.on('uncaughtException', (err) => { console.error('💥 未捕獲的嚴重例外:', err); });
+process.on('uncaughtException', (err) => {
+    console.error('💥 未捕獲的嚴重例外，將退出以避免程序處於不可預期狀態:', err);
+    process.exit(1);
+});

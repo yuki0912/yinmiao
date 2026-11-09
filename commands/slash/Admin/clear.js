@@ -27,7 +27,7 @@ module.exports = {
             const deletedCount = deleted ? deleted.size : 0;
 
             const response = await interaction.reply({
-                content: `✅ Successfully deleted **${deletedCount}** messages!`,
+                content: `✅ 成功刪除 **${deletedCount}** 消息`,
                 withResponse: true
             });
 

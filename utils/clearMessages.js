@@ -97,7 +97,7 @@ async function clearChannelMessages({ channel, amount, targetUserId = null, excl
     };
 }
 
-function formatClearResult(result, targetUserId = null) {
+function formatClearResult(result, targetUserId = null, deleteAfterSeconds = 6) {
     const target = targetUserId ? '成員 <@' + targetUserId + '> 的' : '';
     let content = '🧹 清理完成！實際刪除了' + target + ' **' + result.deleted + '** 則訊息。';
 
@@ -106,7 +106,7 @@ function formatClearResult(result, targetUserId = null) {
     if (result.skippedUndeletable) content += '\n🔒 跳過 ' + result.skippedUndeletable + ' 則不可刪除的訊息。';
     if (result.disappeared) content += '\nℹ️ ' + result.disappeared + ' 則訊息可能已被其他操作刪除，未計入數量。';
 
-    return content + '\n（此提示將於 6 秒後自動刪除）';
+    return content + '\n（此提示將於 ' + deleteAfterSeconds + ' 秒後自動刪除）';
 }
 
 function getClearErrorMessage(error) {

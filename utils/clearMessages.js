@@ -33,7 +33,7 @@ async function checkClearPermissions(guild, channel, memberPermissions) {
         throw new Error('CLEAR_BOT_PERMISSION');
     }
 
-    // 回傳銀喵自己的 ID，讓兩種 clear 都不會刪到 Bot 的任何訊息。
+    // 回傳機器人 ID，保留對既有指令的相容性。
     if (!botMember?.id) throw new Error('CLEAR_BOT_PERMISSION');
     return botMember.id;
 }
@@ -45,10 +45,10 @@ const MAX_SCAN_MESSAGES = 1000;
 async function clearChannelMessages({
     channel, amount, targetUserId = null, excludeMessageId = null, botUserId
 }) {
-    if (!botUserId) throw new Error('CLEAR_BOT_PERMISSION');
+    // botUserId 保留供舊版呼叫端相容；只保護明確指定的訊息 ID。
     const candidates = new Collection();
     const cutoff = Date.now() - TWO_WEEKS_MS + AGE_MARGIN_MS;
-    const limitPerPage = Math.min(100, Math.max(25, amount + 20));
+    const limitPerPage = 100;
 
     let scanned = 0;
     let matched = 0;
@@ -83,10 +83,6 @@ async function clearChannelMessages({
             if (targetUserId && message.author?.id !== targetUserId) continue;
             matched++;
 
-            if (message.author?.id === botUserId) {
-                skippedBot++;
-                continue;
-            }
             if (message.pinned) {
                 skippedPinned++;
                 continue;
@@ -118,7 +114,7 @@ async function clearChannelMessages({
             disappeared = 1;
         }
     } else if (candidates.size > 1) {
-        const removed = await channel.bulkDelete(candidates, true);
+        const removed = await channel.bulkDelete([...candidates.keys()], true);
         deleted = Array.isArray(removed) ? removed.length : removed?.size;
         if (!Number.isInteger(deleted)) {
             throw new Error('CLEAR_UNKNOWN_DELETE_RESULT');
@@ -152,12 +148,10 @@ function formatClearResult(result, targetUserId = null, deleteAfterSeconds = 6) 
             content += '\nℹ️ 頻道內沒有可供檢查的訊息。';
         } else if (targetUserId && !result.matched) {
             content += '\nℹ️ 搜尋範圍內沒有找到指定成員近期可刪除的訊息。';
-        } else if (result.skippedBot && !result.skippedPinned && !result.skippedUndeletable) {
-            content += '\nℹ️ 最近的訊息主要由銀喵發出，因此已保留。';
         }
     }
 
-    if (result.skippedBot) content += '\n🤖 已保留銀喵自己發出的 ' + result.skippedBot + ' 則訊息。';
+
     if (result.skippedPinned) content += '\n📌 跳過 ' + result.skippedPinned + ' 則釘選訊息。';
     if (result.skippedOld) content += '\n⏭️ 跳過 ' + result.skippedOld + ' 則接近或超過 14 天的訊息。';
     if (result.skippedUndeletable) content += '\n🔒 跳過 ' + result.skippedUndeletable + ' 則不可刪除的訊息。';

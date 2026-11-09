@@ -26,13 +26,13 @@ module.exports = {
             const deleted = await interaction.channel.bulkDelete(amount, true).catch(() => null);
             const deletedCount = deleted ? deleted.size : 0;
 
-            const replyMsg = await interaction.reply({
+            const response = await interaction.reply({
                 content: `✅ Successfully deleted **${deletedCount}** messages!`,
-                fetchReply: true
+                withResponse: true
             });
 
             setTimeout(() => {
-                replyMsg.delete().catch(() => {});
+                interaction.deleteReply().catch(() => {});
             }, 5000);
 
         } catch (error) {

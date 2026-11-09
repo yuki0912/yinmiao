@@ -1,52 +1,43 @@
-const { SlashCommandBuilder, EmbedBuilder } = require("discord.js");
-const axios = require("axios");
+const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const { fetchNekosBest, sendSlashResult, executeSlashWithApi } =
+    require('../../../utils/axiosMedia');
 
 module.exports = {
-    category: "Fun",
+    category: 'Fun',
     data: new SlashCommandBuilder()
-        .setName("pat") 
-        .setDescription("摸摸對方的頭 👋")
-        .addUserOption(opt => opt.setName("目標").setDescription("你想互動的成員")),
+        .setName('pat')
+        .setDescription('摸摸對方的頭，隨機發送動漫 GIF 👋')
+        .addUserOption(option => option
+            .setName('目標')
+            .setDescription('想摸摸的成員')
+            .setRequired(false)),
 
     async execute(interaction) {
-        await interaction.deferReply();
-        const cmd = interaction.commandName; // 自動抓取指令名
-        const target = interaction.options.getUser("目標");
-        const user = interaction.user;
+        await executeSlashWithApi(interaction, 'pat', '摸頭動畫', async () => {
+            // 正確網址：https://nekos.best/api/v2/pat
+            const data = await fetchNekosBest('pat');
+            const target = interaction.options.getUser('目標');
+            const author = interaction.user;
 
-        try {
-            // 🚩 修正：URL 格式應為 /api/v2/指令名
-            const res = await axios.get(`https://nekos.best{cmd}`, { timeout: 5000 });
-            const data = res.data?.results?.[0];
-
-            if (!data) throw new Error("無數據");
-
-            const actions = { 
-                cry: "哭了...", 
-                hug: "抱住了", 
-                kiss: "親吻了", 
-                pat: "摸了摸", 
-                punch: "給了一拳", 
-                slap: "甩了一巴掌", 
-                smug: "露出了得意的笑容",
-                smile: "對著你笑了笑"
-            };
-
-            const actionText = target 
-                ? `**${user.username}** ${actions[cmd] || '互動了'} **${target.username}**` 
-                : `**${user.username}** ${actions[cmd] || '執行了動作'}`;
+            const message = target
+                ? '<@' + author.id + '> 輕輕摸了摸 <@' + target.id + '> 的頭！🐾'
+                : '<@' + author.id + '> 送出了一個溫柔的摸頭！🐾';
 
             const embed = new EmbedBuilder()
-                .setDescription(actionText)
+                .setDescription(message)
                 .setImage(data.url)
-                .setColor("Random")
-                .setFooter({ text: data.anime_name ? `動畫來源: ${data.anime_name}` : `由 ${user.tag} 請求` })
+                .setColor('#F2A9B4')
+                .setFooter({
+                    text: data.anime_name
+                        ? '動畫來源：' + String(data.anime_name).slice(0, 200)
+                        : '由 ' + author.username + ' 請求'
+                })
                 .setTimestamp();
 
-            await interaction.editReply({ embeds: [embed] });
-        } catch (e) {
-            console.error("Nekos API Error:", e.message);
-            await interaction.editReply("❌ 暫時無法獲取圖片，請稍後再試。").catch(() => null);
-        }
+            await sendSlashResult(interaction, {
+                embeds: [embed],
+                allowedMentions: { parse: [], users: target ? [target.id] : [] }
+            });
+        });
     }
 };

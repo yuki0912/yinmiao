@@ -16,15 +16,20 @@ function reportError(stage, interaction, error) {
 
 // 公開回覆，並在 5 秒後只刪除這次的結果訊息。
 function deleteResultLater(interaction, messageId = '@original') {
-    setTimeout(async () => {
+    const timer = setTimeout(async () => {
         try {
-            await interaction.deleteReply(messageId);
+            if (messageId === '@original') {
+                await interaction.deleteReply();
+            } else {
+                await interaction.webhook.deleteMessage(messageId);
+            }
         } catch (error) {
             if (![10008, 10062, 50027].includes(error.code)) {
                 reportError('自動刪除結果失敗', interaction, error);
             }
         }
     }, RESULT_DELETE_MS);
+    timer.unref?.();
 }
 
 async function replyPublicly(interaction, content) {
@@ -96,10 +101,12 @@ module.exports = {
                 interaction.guild, interaction.channel, interaction.memberPermissions
             );
 
-            // 公開的互動回覆會被過濾為銀喵自身訊息；不用額外 fetchReply。
-            // 共用工具會逐頁找最多 amount 則可清理的其他成員訊息。
+            // 保護本次 Slash Command 的公開結果提示，不會把它當作清理目標。
+            // 其他普通 Bot 訊息仍可依照 amount 刪除。
+            const originalReply = await interaction.fetchReply();
             const summary = await clearChannelMessages({
-                channel: interaction.channel, amount, targetUserId, botUserId
+                channel: interaction.channel, amount, targetUserId, botUserId,
+                excludeMessageId: originalReply.id
             });
 
             result = formatClearResult(summary, targetUserId, 5);

@@ -1,7 +1,7 @@
 # 🐾 銀喵 YinMiao | 妳的專屬 Discord 萌寵綜合助手
 
 <div align="center">
-  <img src="https://cdn.discordapp.com/app-icons/1368295793496293376/8b504bc9246088aa5b9e6d349fcc06d7.png?size=256" width="150" height="150" alt="YinMiao Logo">
+  <img src="https://cdn.discordapp.com/app-icons/1022229192034746501/4573351ee1a7daa5af4be9ad123b1534.png?size=256" width="150" height="150" alt="YinMiao Logo">
   <p><strong>讓銀喵成為妳伺服器的最佳萌寵與管理控制夥伴喵！🐾</strong></p>
   <p>
     <img src="https://img.shields.io/badge/Discord.js-v14-blue?style=for-the-badge&logo=discord" alt="discord.js">

@@ -16,6 +16,22 @@ module.exports = {
             const phixivUrl = `https://phixiv.net/artworks/${match[1]}`;
             convertedLinks.push(`**[Pixiv](<${rawUrl}>) ‖ [Phixiv](${phixivUrl})**`);
         }
+
+        // 📺 Bilibili (vxbilibili.com)
+        const bilibiliRegex = /https?:\/\/(?:www\.|m\.)?bilibili\.com\/(?!.*vxbilibili\.com)([^\s]+)/g;
+        for (const match of content.matchAll(bilibiliRegex)) {
+            const rawUrl = match[0];
+            const vxUrl = rawUrl.replace(/https?:\/\/(?:www\.|m\.)?bilibili\.com\//, 'https://www.vxbilibili.com/');
+            convertedLinks.push(`**[Bilibili](<${rawUrl}>) ‖ [BiliFix](${vxUrl})**`);
+        }
+
+        // 🧵 Threads (vxthreads.net)
+        const threadsRegex = /https?:\/\/(?:www\.)?(?:threads|fixthreads)\.com\/([^\s]+)/g;
+        for (const match of content.matchAll(threadsRegex)) {
+            const rawUrl = match[0];
+            const vxUrl = rawUrl.replace(/https?:\/\/(?:www\.)?threads\.com\//, 'https://fixthreads.seria.moe/');
+            convertedLinks.push(`**[Threads](<${rawUrl}>) ‖ [FixThreads](${vxUrl})**`);
+        }
         
         // 發送轉換後的超連結並關閉原始預覽
         if (convertedLinks.length > 0) {
@@ -35,7 +51,7 @@ module.exports = {
                 }, 1500);
 
             } catch (error) {
-                console.error('執行連結轉換時出錯:', error);
+                // 靜默略過
             }
         }
     },

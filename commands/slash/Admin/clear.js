@@ -26,14 +26,17 @@ module.exports = {
             const deleted = await interaction.channel.bulkDelete(amount, true).catch(() => null);
             const deletedCount = deleted ? deleted.size : 0;
 
-            const replyMsg = await interaction.reply({
-                content: `✅ Successfully deleted **${deletedCount}** messages!`,
-                fetchReply: true
+            const response = await interaction.reply({
+                content: `✅ 成功刪除 **${deletedCount}** 消息`,
+                withResponse: true
             });
 
-            setTimeout(() => {
-                replyMsg.delete().catch(() => {});
-            }, 5000);
+            const replyMessage = response.resource?.message;
+            if (replyMessage) {
+                setTimeout(() => {
+                    replyMessage.delete().catch(() => {});
+                }, 5000);
+            }
 
         } catch (error) {
             // 靜默略過

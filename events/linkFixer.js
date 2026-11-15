@@ -26,13 +26,20 @@ module.exports = {
         }
 
         // 🧵 Threads (vxthreads.net)
-        const threadsRegex = /https?:\/\/(?:www\.)?(?:threads|fixthreads)\.com\/([^\s]+)/g;
+        const threadsRegex = /https?:\/\/(?:www\.)?threads\.net\/(?!.*fixthreads\.net)([^\s]+)/g;
         for (const match of content.matchAll(threadsRegex)) {
             const rawUrl = match[0];
-            const vxUrl = rawUrl.replace(/https?:\/\/(?:www\.)?threads\.com\//, 'https://fixthreads.seria.moe/');
+            const vxUrl = rawUrl.replace(/https?:\/\/(?:www\.)?threads\.net\//, 'https://fixthreads.seria.moe/');
             convertedLinks.push(`**[Threads](<${rawUrl}>) ‖ [FixThreads](${vxUrl})**`);
         }
-        
+        // 📸 Instagram (ddinstagram.com)
+        const igRegex = /https?:\/\/(?:www\.)?instagram\.com\/(?!.*oginstagram\.com)([^\s]+)/g;
+        for (const match of content.matchAll(igRegex)) {
+            const rawUrl = match[0];
+            const ogUrl = rawUrl.replace(/https?:\/\/(?:www\.)?instagram\.com\//, 'https://www.oginstagram.com/');
+            convertedLinks.push(`**[Instagram](<${rawUrl}>) ‖ [OGIG](${ogUrl})**`);
+        }
+
         // 發送轉換後的超連結並關閉原始預覽
         if (convertedLinks.length > 0) {
             try {

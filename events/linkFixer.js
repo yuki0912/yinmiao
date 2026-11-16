@@ -26,10 +26,10 @@ module.exports = {
         }
 
         // 🧵 Threads (vxthreads.net)
-        const threadsRegex = /https?:\/\/(?:www\.)?threads\.net\/(?!.*fixthreads\.net)([^\s]+)/g;
+        const threadsRegex = /https?:\/\/(?:www\.)?threads\.com\/(?!.*fixthreads\.com)([^\s]+)/g;
         for (const match of content.matchAll(threadsRegex)) {
             const rawUrl = match[0];
-            const vxUrl = rawUrl.replace(/https?:\/\/(?:www\.)?threads\.net\//, 'https://fixthreads.seria.moe/');
+            const vxUrl = rawUrl.replace(/https?:\/\/(?:www\.)?threads\.com\//, 'https://fixthreads.seria.moe/');
             convertedLinks.push(`**[Threads](<${rawUrl}>) ‖ [FixThreads](${vxUrl})**`);
         }
         // 📸 Instagram (ddinstagram.com)

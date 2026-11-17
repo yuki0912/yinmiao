@@ -89,36 +89,55 @@ module.exports = {
             const embeds = [];
 
             if (config.sendCanvas) {
-                const canvas = createCanvas(900, 300);
-                const ctx = canvas.getContext('2d');
+                let canvasWidth = 900;
+                let canvasHeight = 300;
+                let bgImage = null;
 
                 if (config.canvasBg && config.canvasBg.trim() !== '') {
                     try {
-                        const bgImage = await loadImage(config.canvasBg.trim());
-                        ctx.drawImage(bgImage, 0, 0, 900, 300);
-                    } catch (err) {
-                        roundedFill(ctx, 0, 0, 900, 300, 20, '#0B0F19');
-                    }
+                        bgImage = await loadImage(config.canvasBg.trim());
+                        canvasWidth = bgImage.width;
+                        canvasHeight = bgImage.height;
+                    } catch (err) {}
+                }
+
+                const canvas = createCanvas(canvasWidth, canvasHeight);
+                const ctx = canvas.getContext('2d');
+
+                if (bgImage) {
+                    ctx.drawImage(bgImage, 0, 0, canvasWidth, canvasHeight);
                 } else {
-                    roundedFill(ctx, 0, 0, 900, 300, 20, '#0B0F19');
+                    roundedFill(ctx, 0, 0, canvasWidth, canvasHeight, 20, '#0B0F19');
                 }
 
                 const overlayOpacity = typeof config.canvasOverlayOpacity === 'number' ? config.canvasOverlayOpacity : 0.6;
                 if (overlayOpacity > 0) {
-                    roundedFill(ctx, 0, 0, 900, 300, 20, `rgba(0, 0, 0, ${overlayOpacity})`);
+                    roundedFill(ctx, 0, 0, canvasWidth, canvasHeight, 20, `rgba(0, 0, 0, ${overlayOpacity})`);
                 }
 
                 const showAvatar = config.canvasShowAvatar !== false;
 
+                // 頭像半徑完全依畫布高度等比例計算（高度的 26%，300px 時約 78px，與預設卡片視覺比例一致）
+                const scaleFactor = canvasHeight / 300;
+                const avatarRadius = Math.round(canvasHeight * 0.26);
+
+                // 預設無背景圖時字體加大（44px / 38px），有大圖時則依比例同步放大
+                const titleFontSize = Math.round(44 * scaleFactor);
+                const subFontSize = Math.round(38 * scaleFactor);
+
+                const rawMainText = (config.canvasText || '').trim();
+                const rawSubText = (config.canvasSubText || '').trim();
+                const mainText = rawMainText ? parseText(rawMainText) : '';
+                const subText = rawSubText ? parseText(rawSubText) : '';
+
                 if (showAvatar) {
-                    const avatarRadius = Math.max(30, Math.min(120, Number(config.canvasAvatarSize) || 75));
-                    const avatarX = 130;
-                    const avatarY = 150;
+                    const avatarX = Math.max(avatarRadius + Math.round(35 * scaleFactor), canvasWidth * 0.145);
+                    const avatarY = canvasHeight / 2;
 
                     ctx.strokeStyle = config.canvasColor || '#34D399';
-                    ctx.lineWidth = 5;
+                    ctx.lineWidth = Math.max(5, Math.round(5 * scaleFactor));
                     ctx.beginPath();
-                    ctx.arc(avatarX, avatarY, avatarRadius + 5, 0, Math.PI * 2);
+                    ctx.arc(avatarX, avatarY, avatarRadius + Math.round(4 * scaleFactor), 0, Math.PI * 2);
                     ctx.stroke();
 
                     ctx.save();
@@ -127,7 +146,7 @@ module.exports = {
                     ctx.clip();
 
                     try {
-                        const avatarUrl = targetUser.displayAvatarURL({ extension: 'png', size: 256 });
+                        const avatarUrl = targetUser.displayAvatarURL({ extension: 'png', size: 512 });
                         const avatarImage = await loadImage(avatarUrl);
                         ctx.drawImage(avatarImage, avatarX - avatarRadius, avatarY - avatarRadius, avatarRadius * 2, avatarRadius * 2);
                     } catch (e) {
@@ -135,28 +154,34 @@ module.exports = {
                     }
                     ctx.restore();
 
-                    const textStartX = Math.max(250, avatarX + avatarRadius + 40);
-                    const maxTextWidth = 900 - textStartX - 50;
+                    const textStartX = avatarX + avatarRadius + Math.round(40 * scaleFactor);
+                    const maxTextWidth = canvasWidth - textStartX - Math.round(40 * scaleFactor);
 
                     ctx.textAlign = 'left';
-                    ctx.fillStyle = config.canvasColor || '#F472B6';
-                    ctx.font = `bold 50px "${fontFamily}", sans-serif`;
-                    ctx.fillText(parseText(config.canvasText || 'Welcome 歡迎 {server}'), textStartX, 120, maxTextWidth);
-
-                    ctx.fillStyle = config.canvasSubColor || '#FFFFFF';
-                    ctx.font = `bold 50px "${fontFamily}", sans-serif`;
-                    ctx.fillText(parseText(config.canvasSubText || displayName), textStartX, 185, maxTextWidth);
+                    if (mainText) {
+                        ctx.fillStyle = config.canvasColor || '#F472B6';
+                        ctx.font = `bold ${titleFontSize}px "${fontFamily}", sans-serif`;
+                        ctx.fillText(mainText, textStartX, subText ? canvasHeight * 0.42 : canvasHeight * 0.54, maxTextWidth);
+                    }
+                    if (subText) {
+                        ctx.fillStyle = config.canvasSubColor || '#FFFFFF';
+                        ctx.font = `bold ${subFontSize}px "${fontFamily}", sans-serif`;
+                        ctx.fillText(subText, textStartX, mainText ? canvasHeight * 0.68 : canvasHeight * 0.54, maxTextWidth);
+                    }
                 } else {
-                    const maxTextWidth = 800;
-
+                    const maxTextWidth = canvasWidth - Math.round(80 * scaleFactor);
                     ctx.textAlign = 'center';
-                    ctx.fillStyle = config.canvasColor || '#F472B6';
-                    ctx.font = `bold 50px "${fontFamily}", sans-serif`;
-                    ctx.fillText(parseText(config.canvasText || 'Welcome 歡迎 {server}'), 450, 125, maxTextWidth);
 
-                    ctx.fillStyle = config.canvasSubColor || '#FFFFFF';
-                    ctx.font = `bold 50px "${fontFamily}", sans-serif`;
-                    ctx.fillText(parseText(config.canvasSubText || displayName), 450, 190, maxTextWidth);
+                    if (mainText) {
+                        ctx.fillStyle = config.canvasColor || '#F472B6';
+                        ctx.font = `bold ${Math.round(48 * scaleFactor)}px "${fontFamily}", sans-serif`;
+                        ctx.fillText(mainText, canvasWidth / 2, subText ? canvasHeight * 0.42 : canvasHeight * 0.54, maxTextWidth);
+                    }
+                    if (subText) {
+                        ctx.fillStyle = config.canvasSubColor || '#FFFFFF';
+                        ctx.font = `bold ${Math.round(40 * scaleFactor)}px "${fontFamily}", sans-serif`;
+                        ctx.fillText(subText, canvasWidth / 2, mainText ? canvasHeight * 0.68 : canvasHeight * 0.54, maxTextWidth);
+                    }
                 }
 
                 files.push(new AttachmentBuilder(canvas.toBuffer('image/png'), { name: 'welcome-card.png' }));

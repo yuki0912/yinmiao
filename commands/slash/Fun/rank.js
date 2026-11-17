@@ -57,11 +57,11 @@ function drawCorner(ctx, x, y, directionX, directionY, color) {
 function drawStat(ctx, x, label, value, accent) {
     roundedFill(ctx, x, 206, 141, 76, 12, 'rgba(10, 21, 36, 0.67)');
     ctx.fillStyle = '#AFC1CD';
-    ctx.font = 'bold 12px ' + fontFamily;
+    ctx.font = `bold 12px "${fontFamily}", sans-serif`;
     ctx.textAlign = 'left';
     ctx.fillText(label, x + 13, 230, 115);
     ctx.fillStyle = accent;
-    ctx.font = 'bold 25px ' + fontFamily;
+    ctx.font = `bold 25px "${fontFamily}", sans-serif`;
     ctx.fillText(String(value), x + 13, 264, 115);
 }
 
@@ -108,15 +108,15 @@ function drawCard(ctx, data) {
 
     ctx.fillStyle = colors.gold;
     ctx.textAlign = 'left';
-    ctx.font = 'bold 17px ' + fontFamily;
+    ctx.font = `bold 17px "${fontFamily}", sans-serif`;
     ctx.fillText('冒険者の記録', 35, 39);
     ctx.fillStyle = colors.muted;
-    ctx.font = 'bold 11px ' + fontFamily;
+    ctx.font = `bold 11px "${fontFamily}", sans-serif`;
     ctx.fillText('ADVENTURER PROFILE', 202, 38);
 
     roundedFill(ctx, 504, 18, 148, 30, 14, 'rgba(245, 214, 158, 0.10)');
     ctx.fillStyle = colors.gold;
-    ctx.font = 'bold 11px ' + fontFamily;
+    ctx.font = `bold 11px "${fontFamily}", sans-serif`;
     ctx.textAlign = 'center';
     ctx.fillText('✦ PERMANENT XP', 578, 38, 135);
 
@@ -154,18 +154,18 @@ function drawCard(ctx, data) {
         roundedFill(ctx, 40, 90, 146, 146, 70, '#3B526B');
         ctx.fillStyle = colors.white;
         ctx.textAlign = 'center';
-        ctx.font = 'bold 70px ' + fontFamily;
+        ctx.font = `bold 70px "${fontFamily}", sans-serif`;
         ctx.fillText('★', 113, 187);
     }
     ctx.restore();
 
     ctx.textAlign = 'left';
     ctx.fillStyle = colors.white;
-    ctx.font = 'bold 34px ' + fontFamily;
+    ctx.font = `bold 34px "${fontFamily}", sans-serif`;
     ctx.fillText(data.username, 213, 124, 441);
 
     ctx.fillStyle = colors.pink;
-    ctx.font = 'bold 14px ' + fontFamily;
+    ctx.font = `bold 14px "${fontFamily}", sans-serif`;
     ctx.fillText('✦ 冒險進度 · 永久累積', 216, 155, 420);
     ctx.fillStyle = colors.muted;
     ctx.font = '12px ' + fontFamily;
@@ -176,7 +176,7 @@ function drawCard(ctx, data) {
     drawStat(ctx, 511, '距離下一級', data.remainingText, colors.pink);
 
     ctx.fillStyle = colors.muted;
-    ctx.font = 'bold 11px ' + fontFamily;
+    ctx.font = `bold 11px "${fontFamily}", sans-serif`;
     ctx.fillText('LEVEL PROGRESS', 37, 310);
 
     roundedFill(ctx, 216, 301, 438, 10, 5, '#091522');
@@ -198,7 +198,7 @@ function drawCard(ctx, data) {
 
     ctx.textAlign = 'left';
     ctx.fillStyle = colors.muted;
-    ctx.font = 'bold 14px ' + fontFamily;
+    ctx.font = `bold 14px "${fontFamily}", sans-serif`;
     ctx.fillText('LEVEL', 742, 41);
     ctx.fillStyle = colors.pink;
     ctx.font = '12px ' + fontFamily;
@@ -207,7 +207,7 @@ function drawCard(ctx, data) {
     roundedFill(ctx, 733, 57, 244, 76, 13, '#0A1726');
     ctx.textAlign = 'center';
     ctx.fillStyle = colors.gold;
-    ctx.font = 'bold 53px ' + fontFamily;
+    ctx.font = `bold 53px "${fontFamily}", sans-serif`;
     ctx.fillText(String(data.level), 855, 116, 214);
 
     const expBg = ctx.createLinearGradient(710, 175, 1000, 330);
@@ -218,7 +218,7 @@ function drawCard(ctx, data) {
 
     ctx.textAlign = 'left';
     ctx.fillStyle = colors.muted;
-    ctx.font = 'bold 14px ' + fontFamily;
+    ctx.font = `bold 14px "${fontFamily}", sans-serif`;
     ctx.fillText('EXP', 742, 211);
     ctx.fillStyle = colors.pink;
     ctx.font = '12px ' + fontFamily;
@@ -227,7 +227,7 @@ function drawCard(ctx, data) {
     roundedFill(ctx, 733, 225, 244, 56, 13, '#0A1726');
     ctx.textAlign = 'center';
     ctx.fillStyle = colors.white;
-    ctx.font = 'bold 22px ' + fontFamily;
+    ctx.font = `bold 22px "${fontFamily}", sans-serif`;
     ctx.fillText(data.levelXpText + ' / ' + data.levelMaxText, 855, 262, 218);
 
     roundedFill(ctx, 733, 293, 244, 10, 5, '#0A1726');
@@ -239,7 +239,7 @@ function drawCard(ctx, data) {
     }
 
     ctx.fillStyle = colors.muted;
-    ctx.font = 'bold 11px ' + fontFamily;
+    ctx.font = `bold 11px "${fontFamily}", sans-serif`;
     ctx.textAlign = 'right';
     ctx.fillText(Math.round(data.progress * 100) + '%', 976, 320);
 

@@ -54,31 +54,38 @@ module.exports = {
             };
 
             if (config.sendCanvas) {
-                const canvas = createCanvas(900, 300);
-                const ctx = canvas.getContext('2d');
+                let canvasWidth = 900;
+                let canvasHeight = 300;
+                let bgImage = null;
 
                 if (config.canvasBg && config.canvasBg.trim() !== '') {
                     try {
-                        const bgImage = await loadImage(config.canvasBg.trim());
-                        ctx.drawImage(bgImage, 0, 0, 900, 300);
-                    } catch (err) {
-                        roundedFill(ctx, 0, 0, 900, 300, 20, '#0B0F19');
-                    }
+                        bgImage = await loadImage(config.canvasBg.trim());
+                        canvasWidth = bgImage.width;
+                        canvasHeight = bgImage.height;
+                    } catch (err) {}
+                }
+
+                const canvas = createCanvas(canvasWidth, canvasHeight);
+                const ctx = canvas.getContext('2d');
+
+                if (bgImage) {
+                    ctx.drawImage(bgImage, 0, 0, canvasWidth, canvasHeight);
                 } else {
-                    roundedFill(ctx, 0, 0, 900, 300, 20, '#0B0F19');
+                    roundedFill(ctx, 0, 0, canvasWidth, canvasHeight, 20, '#0B0F19');
                 }
 
                 const overlayOpacity = typeof config.canvasOverlayOpacity === 'number' ? config.canvasOverlayOpacity : 0.6;
                 if (overlayOpacity > 0) {
-                    roundedFill(ctx, 0, 0, 900, 300, 20, `rgba(0, 0, 0, ${overlayOpacity})`);
+                    roundedFill(ctx, 0, 0, canvasWidth, canvasHeight, 20, `rgba(0, 0, 0, ${overlayOpacity})`);
                 }
 
                 const showAvatar = config.canvasShowAvatar !== false;
 
                 if (showAvatar) {
                     const avatarRadius = Math.max(30, Math.min(120, Number(config.canvasAvatarSize) || 75));
-                    const avatarX = 130;
-                    const avatarY = 150;
+                    const avatarX = Math.min(130, canvasWidth * 0.15);
+                    const avatarY = canvasHeight / 2;
 
                     ctx.strokeStyle = config.canvasColor || '#34D399';
                     ctx.lineWidth = 5;
@@ -100,28 +107,28 @@ module.exports = {
                     }
                     ctx.restore();
 
-                    const textStartX = Math.max(250, avatarX + avatarRadius + 40);
-                    const maxTextWidth = 900 - textStartX - 50;
+                    const textStartX = avatarX + avatarRadius + 40;
+                    const maxTextWidth = canvasWidth - textStartX - 50;
 
                     ctx.textAlign = 'left';
                     ctx.fillStyle = config.canvasColor || '#F472B6';
-                    ctx.font = `bold 50px "${fontFamily}", sans-serif`;
-                    ctx.fillText(parseText(config.canvasText || 'Welcome 歡迎 {server}'), textStartX, 120, maxTextWidth);
+                    ctx.font = `bold 36px "${fontFamily}", sans-serif`;
+                    ctx.fillText(parseText(config.canvasText || 'Welcome 歡迎 {server}'), textStartX, canvasHeight * 0.4, maxTextWidth);
 
                     ctx.fillStyle = config.canvasSubColor || '#FFFFFF';
-                    ctx.font = `bold 50px "${fontFamily}", sans-serif`;
-                    ctx.fillText(parseText(config.canvasSubText || displayName), textStartX, 185, maxTextWidth);
+                    ctx.font = `bold 36px "${fontFamily}", sans-serif`;
+                    ctx.fillText(parseText(config.canvasSubText || displayName), textStartX, canvasHeight * 0.65, maxTextWidth);
                 } else {
-                    const maxTextWidth = 800;
+                    const maxTextWidth = canvasWidth - 100;
 
                     ctx.textAlign = 'center';
                     ctx.fillStyle = config.canvasColor || '#F472B6';
-                    ctx.font = `bold 50px "${fontFamily}", sans-serif`;
-                    ctx.fillText(parseText(config.canvasText || 'Welcome 歡迎 {server}'), 450, 125, maxTextWidth);
+                    ctx.font = `bold 40px "${fontFamily}", sans-serif`;
+                    ctx.fillText(parseText(config.canvasText || 'Welcome 歡迎 {server}'), canvasWidth / 2, canvasHeight * 0.4, maxTextWidth);
 
                     ctx.fillStyle = config.canvasSubColor || '#FFFFFF';
-                    ctx.font = `bold 50px "${fontFamily}", sans-serif`;
-                    ctx.fillText(parseText(config.canvasSubText || displayName), 450, 190, maxTextWidth);
+                    ctx.font = `bold 36px "${fontFamily}", sans-serif`;
+                    ctx.fillText(parseText(config.canvasSubText || displayName), canvasWidth / 2, canvasHeight * 0.65, maxTextWidth);
                 }
 
                 const attachment = new AttachmentBuilder(canvas.toBuffer('image/png'), { name: 'welcome-card.png' });

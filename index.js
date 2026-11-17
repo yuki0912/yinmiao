@@ -484,6 +484,7 @@ app.post('/api/save-config', async (req, res) => {
             welcomeImageUrl: 'welcomeImageUrl',
             canvasText: 'canvasText',
             canvasAvatarSize: 'canvasAvatarSize',
+            canvasShowAvatar: 'canvasShowAvatar',
             canvasMainText: 'canvasText',
             canvasSubText: 'canvasSubText',
             canvasColor: 'canvasColor',

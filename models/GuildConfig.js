@@ -20,6 +20,8 @@ const GuildConfigSchema = new mongoose.Schema({
     canvasSubColor: { type: String, default: "#FFFFFF" },  // 🐾 新增：副標題文字顏色
     canvasBg: { type: String, default: "" },
     canvasOverlayOpacity: { type: Number, default: "" },   // 🐾 新增：背景半透明遮罩透明度 (0 ~ 1.0)
+    canvasShowAvatar: { type: Boolean, default: true },
+    canvasAvatarSize: { type: Number, default: 75 },
 
     // 開關與頁尾設定
     sendEmbed: { type: Boolean, default: true },

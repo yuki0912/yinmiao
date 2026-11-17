@@ -6,7 +6,7 @@ module.exports = {
     category: 'Fun',
     data: new SlashCommandBuilder()
         .setName('waifu')
-        .setDescription('使用 axios 從 nekos.best 取得隨機動漫老婆圖片 ✨'),
+        .setDescription('取得隨機動漫老婆圖片✨'),
 
     async execute(interaction) {
         await executeSlashWithApi(interaction, 'waifu', '動漫圖片', async () => {

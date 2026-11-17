@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, EmbedBuilder, AttachmentBuilder, PermissionFlagsBits } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder, AttachmentBuilder, PermissionFlagsBits, ChannelType } = require('discord.js');
 const { createCanvas, loadImage, GlobalFonts } = require('@napi-rs/canvas');
 const GuildConfig = require('../../../models/GuildConfig');
 const path = require('node:path');
@@ -30,11 +30,16 @@ module.exports = {
         .addUserOption(option =>
             option.setName('user')
                 .setDescription('模擬加入的成員（預設為你自己）')
+        )
+        .addChannelOption(option =>
+            option.setName('channel')
+                .setDescription('指定要發送測試訊息的頻道（預設為後台設定的歡迎頻道）')
+                .addChannelTypes(ChannelType.GuildText)
         ),
 
     async execute(interaction) {
         if (!interaction.deferred && !interaction.replied) {
-            await interaction.deferReply();
+            await interaction.deferReply({ ephemeral: true });
         }
 
         try {
@@ -47,23 +52,37 @@ module.exports = {
                 return await interaction.editReply({ content: '❌ 找不到此伺服器的歡迎設定，請先至網頁後台儲存設定喵！' });
             }
 
+            const targetChannel = interaction.options.getChannel('channel')
+                || (config.welcomeChannelId ? await interaction.guild.channels.fetch(config.welcomeChannelId).catch(() => null) : null)
+                || interaction.channel;
+
+            if (!targetChannel || !targetChannel.isTextBased()) {
+                return await interaction.editReply({ content: '❌ 找不到有效的文字頻道來發送測試歡迎訊息喵！' });
+            }
+
             const targetUser = interaction.options.getUser('user') || interaction.user;
             const member = await interaction.guild.members.fetch(targetUser.id).catch(() => null);
             const displayName = member ? member.displayName : targetUser.username;
+            const rawUsername = targetUser.username;
+            const userId = targetUser.id;
+            const userMention = `<@${targetUser.id}>`;
+            const guildName = interaction.guild.name;
+            const memberCount = interaction.guild.memberCount.toString();
 
             const parseText = (text) => {
                 if (!text) return '';
                 return text
-                    .replace(/{user}/g, userReplacement)
+                    .replace(/{user}/g, userMention)
+                    .replace(/{user_mention}/g, userMention)
                     .replace(/{user_name}/g, displayName)
+                    .replace(/{display_name}/g, displayName)
                     .replace(/{username}/g, rawUsername)
                     .replace(/{user_id}/g, userId)
-                    .replace(/{display_name}/g, displayName)
-                    .replace(/{user_mention}/g, `<@${user.id}>`)
-                    .replace(/{guild}/g, guild.name)
-                    .replace(/{guild_name}/g, guild.name)
-                    .replace(/{count}/g, guild.memberCount.toString())
-                    .replace(/{member_count}/g, guild.memberCount.toString());
+                    .replace(/{server}/g, guildName)
+                    .replace(/{guild}/g, guildName)
+                    .replace(/{guild_name}/g, guildName)
+                    .replace(/{count}/g, memberCount)
+                    .replace(/{member_count}/g, memberCount);
             };
 
             const files = [];
@@ -89,48 +108,56 @@ module.exports = {
                     roundedFill(ctx, 0, 0, 900, 300, 20, `rgba(0, 0, 0, ${overlayOpacity})`);
                 }
 
-                // 頭像與排版尺寸設定（對應截圖中的完美比例，預設半徑 75）
-                const avatarRadius = Math.max(30, Math.min(120, Number(config.canvasAvatarSize) || 75));
-                const avatarX = 130;
-                const avatarY = 150;
+                const showAvatar = config.canvasShowAvatar !== false;
 
-                // 繪製頭像外框
-                ctx.strokeStyle = config.canvasColor || '#34D399';
-                ctx.lineWidth = 5;
-                ctx.beginPath();
-                ctx.arc(avatarX, avatarY, avatarRadius + 5, 0, Math.PI * 2);
-                ctx.stroke();
+                if (showAvatar) {
+                    const avatarRadius = Math.max(30, Math.min(120, Number(config.canvasAvatarSize) || 75));
+                    const avatarX = 130;
+                    const avatarY = 150;
 
-                // 裁切並繪製頭像
-                ctx.save();
-                ctx.beginPath();
-                ctx.arc(avatarX, avatarY, avatarRadius, 0, Math.PI * 2);
-                ctx.clip();
+                    ctx.strokeStyle = config.canvasColor || '#34D399';
+                    ctx.lineWidth = 5;
+                    ctx.beginPath();
+                    ctx.arc(avatarX, avatarY, avatarRadius + 5, 0, Math.PI * 2);
+                    ctx.stroke();
 
-                try {
-                    const avatarUrl = targetUser.displayAvatarURL({ extension: 'png', size: 256 });
-                    const avatarImage = await loadImage(avatarUrl);
-                    ctx.drawImage(avatarImage, avatarX - avatarRadius, avatarY - avatarRadius, avatarRadius * 2, avatarRadius * 2);
-                } catch (e) {
-                    roundedFill(ctx, avatarX - avatarRadius, avatarY - avatarRadius, avatarRadius * 2, avatarRadius * 2, avatarRadius, '#334155');
+                    ctx.save();
+                    ctx.beginPath();
+                    ctx.arc(avatarX, avatarY, avatarRadius, 0, Math.PI * 2);
+                    ctx.clip();
+
+                    try {
+                        const avatarUrl = targetUser.displayAvatarURL({ extension: 'png', size: 256 });
+                        const avatarImage = await loadImage(avatarUrl);
+                        ctx.drawImage(avatarImage, avatarX - avatarRadius, avatarY - avatarRadius, avatarRadius * 2, avatarRadius * 2);
+                    } catch (e) {
+                        roundedFill(ctx, avatarX - avatarRadius, avatarY - avatarRadius, avatarRadius * 2, avatarRadius * 2, avatarRadius, '#334155');
+                    }
+                    ctx.restore();
+
+                    const textStartX = Math.max(250, avatarX + avatarRadius + 40);
+                    const maxTextWidth = 900 - textStartX - 50;
+
+                    ctx.textAlign = 'left';
+                    ctx.fillStyle = config.canvasColor || '#F472B6';
+                    ctx.font = `bold 50px "${fontFamily}", sans-serif`;
+                    ctx.fillText(parseText(config.canvasText || 'Welcome 歡迎 {server}'), textStartX, 120, maxTextWidth);
+
+                    ctx.fillStyle = config.canvasSubColor || '#FFFFFF';
+                    ctx.font = `bold 50px "${fontFamily}", sans-serif`;
+                    ctx.fillText(parseText(config.canvasSubText || displayName), textStartX, 185, maxTextWidth);
+                } else {
+                    const maxTextWidth = 800;
+
+                    ctx.textAlign = 'center';
+                    ctx.fillStyle = config.canvasColor || '#F472B6';
+                    ctx.font = `bold 50px "${fontFamily}", sans-serif`;
+                    ctx.fillText(parseText(config.canvasText || 'Welcome 歡迎 {server}'), 450, 125, maxTextWidth);
+
+                    ctx.fillStyle = config.canvasSubColor || '#FFFFFF';
+                    ctx.font = `bold 50px "${fontFamily}", sans-serif`;
+                    ctx.fillText(parseText(config.canvasSubText || displayName), 450, 190, maxTextWidth);
                 }
-                ctx.restore();
-
-                // 計算文字動態座標與最大寬度
-                const textStartX = Math.max(250, avatarX + avatarRadius + 40);
-                const maxTextWidth = 900 - textStartX - 40;
-
-                const mainText = parseText(config.canvasText || 'Welcome 歡迎 {server}');
-                const subText = parseText(config.canvasSubText || displayName);
-
-                ctx.textAlign = 'left';
-                ctx.fillStyle = config.canvasColor || '#F472B6';
-                ctx.font = `bold 36px ${fontFamily}`;
-                ctx.fillText(mainText, textStartX, 120, maxTextWidth);
-
-                ctx.fillStyle = config.canvasSubColor || '#FFFFFF';
-                ctx.font = `bold 30px ${fontFamily}`;
-                ctx.fillText(subText, textStartX, 185, maxTextWidth);
 
                 files.push(new AttachmentBuilder(canvas.toBuffer('image/png'), { name: 'welcome-card.png' }));
             }
@@ -159,17 +186,21 @@ module.exports = {
                 });
             }
 
-            await interaction.editReply({
+            await targetChannel.send({
                 content: contentText || undefined,
                 embeds,
                 files,
-                allowedMentions: { parse: [] }
+                allowedMentions: { parse: ['users'] }
+            });
+
+            await interaction.editReply({
+                content: `✅ 測試歡迎訊息已成功發送至 ${targetChannel} 頻道囉喵！🐾`
             });
 
         } catch (error) {
             try {
                 await interaction.editReply({
-                    content: '❌ 測試歡迎卡片時發生錯誤，請稍後再試喵！'
+                    content: '❌ 測試歡迎卡片時發生錯誤，請檢查圖片網址是否有效喵！'
                 });
             } catch (e) { }
         }

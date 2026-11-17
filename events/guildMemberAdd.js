@@ -1,122 +1,39 @@
-const { Events, EmbedBuilder, AttachmentBuilder, PermissionFlagsBits } = require('discord.js');
-const { createCanvas, loadImage, registerFont } = require('canvas');
+const { Events, EmbedBuilder, AttachmentBuilder } = require('discord.js');
+const { createCanvas, loadImage, GlobalFonts } = require('@napi-rs/canvas');
 const GuildConfig = require('../models/GuildConfig');
 const path = require('node:path');
 const fs = require('node:fs');
 
-// --- 1. 字體註冊與繪圖輔助工具 ---
 const fontPath = path.join(__dirname, '../NotoSansTC-Bold.ttf');
-let fontName = 'sans-serif';
-
+let fontFamily = 'sans-serif';
 if (fs.existsSync(fontPath)) {
-    // 指定 family 為 "Noto Sans TC" 並明確標註 weight 為 "bold"
-    registerFont(fontPath, { family: "Noto Sans TC", weight: "bold" });
-    fontName = "Noto Sans TC";
+    try {
+        GlobalFonts.registerFromPath(fontPath, 'YinMiaoWelcome');
+        fontFamily = 'YinMiaoWelcome';
+    } catch (e) {}
 }
 
-// 動態調整字體大小以適應最大寬度
-const applyText = (canvas, text, maxWidth, baseSize) => {
-    const ctx = canvas.getContext('2d');
-    let fontSize = baseSize;
-    do {
-        ctx.font = `bold ${fontSize}px "${fontName}"`;
-        fontSize -= 2;
-    } while (ctx.measureText(text).width > maxWidth && fontSize > 10);
-    return ctx.font;
-};
+function roundedFill(ctx, x, y, width, height, radius, color) {
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.roundRect(x, y, width, height, radius);
+    ctx.fill();
+}
 
-// 背景圖片 Cover 裁切繪製
-const drawCoverImage = (ctx, img, canvasWidth, canvasHeight) => {
-    const imgRatio = img.width / img.height;
-    const canvasRatio = canvasWidth / canvasHeight;
-    let sx, sy, sWidth, sHeight;
+module.exports = {
+    name: Events.GuildMemberAdd,
+    async execute(member) {
+        try {
+            const config = await GuildConfig.findOne({ guildId: member.guild.id });
+            if (!config || !config.welcomeChannelId) return;
 
-    if (imgRatio > canvasRatio) {
-        sHeight = img.height;
-        sWidth = img.height * canvasRatio;
-        sx = (img.width - sWidth) / 2;
-        sy = 0;
-    } else {
-        sWidth = img.width;
-        sHeight = img.width / canvasRatio;
-        sx = 0;
-        sy = (img.height - sHeight) / 2;
-    }
+            const channel = await member.guild.channels.fetch(config.welcomeChannelId).catch(() => null);
+            if (!channel || !channel.isTextBased()) return;
 
-    ctx.drawImage(img, sx, sy, sWidth, sHeight, 0, 0, canvasWidth, canvasHeight);
-};
-
-// 預設深色漸層背景
-const drawDefaultBg = (ctx, width = 800, height = 250) => {
-    const gradient = ctx.createLinearGradient(0, 0, width, height);
-    gradient.addColorStop(0, 'rgb(0, 0, 0)');
-    gradient.addColorStop(1, '#000000');
-    ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, width, height);
-};
-
-const isValidHex = (color) => /^#[0-9A-F]{6}$/i.test(color);
-
-async function sendWelcomeMessage(member, { channel: overrideChannel } = {}) {
-    if (!member?.guild || !member?.user) {
-        throw new Error('無效的伺服器成員資料，無法產生歡迎訊息。');
-    }
-
-    const { guild, user } = member;
-    const config = await GuildConfig.findOne({ guildId: guild.id }) || {};
-
-    let welcomeChannel = null;
-
-    // 測試指令可暫時指定發送頻道；不會覆寫資料庫中的正式歡迎頻道。
-    if (overrideChannel) {
-        if (overrideChannel.guildId !== guild.id) {
-            throw new Error('指定的測試頻道不屬於目前的伺服器。');
-        }
-        welcomeChannel = overrideChannel;
-    } else if (config.welcomeChannelId) {
-        welcomeChannel = guild.channels.cache.get(config.welcomeChannelId)
-            || await guild.channels.fetch(config.welcomeChannelId).catch(() => null);
-
-        if (!welcomeChannel) {
-            throw new Error(`設定的歡迎頻道（ID: ${config.welcomeChannelId}）不存在或機器人無法存取，請重新設定頻道。`);
-        }
-    } else {
-        welcomeChannel = guild.systemChannel;
-    }
-
-    if (!welcomeChannel) {
-        throw new Error('尚未設定歡迎頻道。請在指令中選擇測試頻道，或先到控制台設定正式歡迎頻道。');
-    }
-
-    if (typeof welcomeChannel.send !== 'function' || !welcomeChannel.isTextBased?.()) {
-        throw new Error('指定的頻道不是可發送訊息的文字頻道。');
-    }
-
-    const botMember = guild.members.me;
-    if (botMember && typeof welcomeChannel.permissionsFor === 'function') {
-        const permissions = welcomeChannel.permissionsFor(botMember);
-        if (permissions && !permissions.has(PermissionFlagsBits.ViewChannel)) {
-            throw new Error('機器人沒有查看歡迎頻道的權限。');
-        }
-        if (permissions && !permissions.has(PermissionFlagsBits.SendMessages)) {
-            throw new Error('機器人沒有在歡迎頻道發送訊息的權限。');
-        }
-    }
-
-            // 變數替換解析
-            const replaceVars = (str, isMention = false, isCanvas = false) => {
-                if (!str) return "";
-                
-                const displayName = member.displayName || user.globalName || user.username;
-                const rawUsername = user.username;
-                const userId = user.id;
-
-                const userReplacement = isCanvas 
-                    ? displayName 
-                    : (isMention ? `<@${user.id}>` : displayName);
-
-                return str
-                    .replace(/{user}/g, userReplacement)
+            const parseText = (text) => {
+                if (!text) return '';
+                return text
+                        .replace(/{user}/g, userReplacement)
                     .replace(/{user_name}/g, displayName)
                     .replace(/{username}/g, rawUsername)
                     .replace(/{user_id}/g, userId)
@@ -128,183 +45,100 @@ async function sendWelcomeMessage(member, { channel: overrideChannel } = {}) {
                     .replace(/{member_count}/g, guild.memberCount.toString());
             };
 
-            // 外顯文字預設值
-            const rawWelcomeContent = config.welcomeContent || "🐾 welcome {user} to the {guild}!";
-            const textContent = replaceVars(rawWelcomeContent, true);
-
-            // Canvas 卡片文字保底預設值處理
-            let rawMainText = config.canvasMainText || config.canvasText;
-            if (!rawMainText || rawMainText.trim() === '') {
-                rawMainText = "Welcome {guild}";
-            }
-
-            let rawSubText = config.canvasSubText;
-            if (!rawSubText || rawSubText.trim() === '' || rawSubText.trim() === '{user}') {
-                rawSubText = "歡迎 {user} 加入伺服器！";
-            }
-
-            const imgMainText = replaceVars(rawMainText, false, true);
-            const imgSubText = replaceVars(rawSubText, false, true);
-
-            const messagePayload = { content: textContent, files: [] };
-            let hasCanvas = false;
-            let attachment = null;
-
-            // --- Canvas 卡片繪製 ---
             if (config.sendCanvas) {
-                hasCanvas = true;
-                const canvasWidth = 800;
-                const canvasHeight = 250;
-                const canvas = createCanvas(canvasWidth, canvasHeight);
+                const canvas = createCanvas(900, 300);
                 const ctx = canvas.getContext('2d');
 
-                // 背景處理
-                let bgLoaded = false;
-                const customBgUrl = config.canvasBg || config.canvasBackgroundUrl || config.customBg;
-
-                if (customBgUrl && typeof customBgUrl === 'string' && customBgUrl.trim() !== '') {
+                if (config.canvasBg && config.canvasBg.trim() !== '') {
                     try {
-                        const bgImage = await loadImage(customBgUrl.trim());
-                        drawCoverImage(ctx, bgImage, canvasWidth, canvasHeight);
-
-                        const opacity = (config.canvasOverlayOpacity !== undefined && !isNaN(config.canvasOverlayOpacity))
-                            ? Number(config.canvasOverlayOpacity) 
-                            : 0;
-
-                        if (opacity > 0) {
-                            ctx.fillStyle = `rgba(0, 0, 0, ${opacity})`;
-                            ctx.fillRect(0, 0, canvasWidth, canvasHeight);
-                        }
-                        bgLoaded = true;
-                    } catch (e) {
-                        console.warn(`⚠️ 背景圖片載入失敗 (${e.message})，退回預設背景`);
+                        const bgImage = await loadImage(config.canvasBg.trim());
+                        ctx.drawImage(bgImage, 0, 0, 900, 300);
+                    } catch (err) {
+                        roundedFill(ctx, 0, 0, 900, 300, 20, '#0B0F19');
                     }
+                } else {
+                    roundedFill(ctx, 0, 0, 900, 300, 20, '#0B0F19');
                 }
 
-                if (!bgLoaded) {
-                    drawDefaultBg(ctx, canvasWidth, canvasHeight);
+                const overlayOpacity = typeof config.canvasOverlayOpacity === 'number' ? config.canvasOverlayOpacity : 0.6;
+                if (overlayOpacity > 0) {
+                    roundedFill(ctx, 0, 0, 900, 300, 20, `rgba(0, 0, 0, ${overlayOpacity})`);
                 }
 
-                // 顏色與樣式設定
-                const mainTextColor = isValidHex(config.canvasColor) ? config.canvasColor : '#00FFA3';
-                const subTextColor = isValidHex(config.canvasSubColor) ? config.canvasSubColor : '#FFFFFF';
-                const avatarBorderColor = isValidHex(config.avatarBorderColor) ? config.avatarBorderColor : '#00FFA3';
+                // 頭像與排版尺寸設定（對應截圖中的完美比例，預設半徑 75）
+                const avatarRadius = Math.max(30, Math.min(120, Number(config.canvasAvatarSize) || 75));
+                const avatarX = 130;
+                const avatarY = 150;
 
-                ctx.textBaseline = 'middle';
+                // 繪製頭像外框護盾
+                ctx.strokeStyle = config.canvasColor || '#34D399';
+                ctx.lineWidth = 5;
+                ctx.beginPath();
+                ctx.arc(avatarX, avatarY, avatarRadius + 5, 0, Math.PI * 2);
+                ctx.stroke();
 
-                // 繪製主標題
-                if (imgMainText && imgMainText.trim() !== '') {
-                    ctx.fillStyle = mainTextColor;
-                    ctx.font = applyText(canvas, imgMainText, 500, 42);
-                    ctx.fillText(imgMainText, 250, 95);
-                }
-
-                // 繪製副標題
-                if (imgSubText && imgSubText.trim() !== '') {
-                    ctx.fillStyle = subTextColor;
-                    ctx.font = applyText(canvas, imgSubText, 500, 38);
-                    ctx.fillText(imgSubText, 250, 155);
-                }
-
-                // 繪製圓形頭像
-                const ax = 125, ay = 125, r = 75;
+                // 裁切並繪製成員頭像
                 ctx.save();
                 ctx.beginPath();
-                ctx.arc(ax, ay, r, 0, Math.PI * 2, true);
+                ctx.arc(avatarX, avatarY, avatarRadius, 0, Math.PI * 2);
                 ctx.clip();
 
                 try {
-                    const avatarUrl = user.displayAvatarURL({ extension: 'png', size: 256 });
-                    const av = await loadImage(avatarUrl);
-                    ctx.drawImage(av, ax - r, ay - r, r * 2, r * 2);
+                    const avatarUrl = member.user.displayAvatarURL({ extension: 'png', size: 256 });
+                    const avatarImage = await loadImage(avatarUrl);
+                    ctx.drawImage(avatarImage, avatarX - avatarRadius, avatarY - avatarRadius, avatarRadius * 2, avatarRadius * 2);
                 } catch (e) {
-                    ctx.fillStyle = '#333333';
-                    ctx.fill();
+                    roundedFill(ctx, avatarX - avatarRadius, avatarY - avatarRadius, avatarRadius * 2, avatarRadius * 2, avatarRadius, '#334155');
                 }
                 ctx.restore();
 
-                // 頭像外框線條
-                ctx.strokeStyle = avatarBorderColor;
-                ctx.lineWidth = 5;
-                ctx.beginPath();
-                ctx.arc(ax, ay, r, 0, Math.PI * 2);
-                ctx.stroke();
+                // 計算文字動態座標與最大寬度（避免頭像變大時壓到文字）
+                const textStartX = Math.max(250, avatarX + avatarRadius + 40);
+                const maxTextWidth = 900 - textStartX - 40;
 
-                attachment = new AttachmentBuilder(canvas.toBuffer('image/png'), { name: 'welcome-card.png' });
+                const mainText = parseText(config.canvasText || 'Welcome 歡迎 {server}');
+                const subText = parseText(config.canvasSubText || member.displayName || member.user.username);
+
+                ctx.textAlign = 'left';
+                ctx.fillStyle = config.canvasColor || '#F472B6';
+                ctx.font = `bold 36px ${fontFamily}`;
+                ctx.fillText(mainText, textStartX, 120, maxTextWidth);
+
+                ctx.fillStyle = config.canvasSubColor || '#FFFFFF';
+                ctx.font = `bold 30px ${fontFamily}`;
+                ctx.fillText(subText, textStartX, 185, maxTextWidth);
+
+                const attachment = new AttachmentBuilder(canvas.toBuffer('image/png'), { name: 'welcome-card.png' });
+                const contentText = parseText(config.welcomeContent || '');
+
+                await channel.send({
+                    content: contentText || undefined,
+                    files: [attachment],
+                    allowedMentions: { parse: ['users'] }
+                });
+                return;
             }
 
-            // --- Embed 組裝 ---
             if (config.sendEmbed) {
-                const welcomeEmbed = new EmbedBuilder();
+                const embed = new EmbedBuilder()
+                    .setTitle(parseText(config.welcomeTitle || '歡迎加入！'))
+                    .setDescription(parseText(config.welcomeDescription || '歡迎 {user} 來到 {server}！'))
+                    .setColor(config.welcomeEmbedColor || '#F472B6')
+                    .setTimestamp();
 
-                const rawColor = config.welcomeEmbedColor || config.embedColor;
-                if (isValidHex(rawColor)) {
-                    welcomeEmbed.setColor(rawColor);
-                }
+                if (config.welcomeImageUrl) embed.setImage(config.welcomeImageUrl);
+                if (config.showFooter) embed.setFooter({ text: parseText(config.welcomeFooter || member.guild.name) });
 
-                const formattedTitle = replaceVars(config.welcomeTitle);
-                if (formattedTitle && formattedTitle.trim() !== '') {
-                    welcomeEmbed.setTitle(formattedTitle.trim());
-                }
-
-                const formattedDesc = replaceVars(config.welcomeDescription);
-                if (formattedDesc && formattedDesc.trim() !== '') {
-                    welcomeEmbed.setDescription(formattedDesc.trim());
-                }
-
-                if (hasCanvas && attachment) {
-                    messagePayload.files.push(attachment);
-                    welcomeEmbed.setImage('attachment://welcome-card.png');
-                }
-
-                if (config.showTimestamp) welcomeEmbed.setTimestamp();
-
-                if (config.showFooter) {
-                    const emFooter = replaceVars(config.welcomeFooter);
-                    if (emFooter && emFooter.trim() !== '') {
-                        welcomeEmbed.setFooter({
-                            text: emFooter.trim(),
-                            iconURL: config.welcomeFooterIcon || guild.iconURL()
-                        });
-                    }
-                }
-
-                const embedData = welcomeEmbed.toJSON();
-                const hasEmbedContent = Boolean(
-                    embedData.title
-                    || embedData.description
-                    || embedData.image
-                    || embedData.thumbnail
-                    || embedData.author
-                    || embedData.footer
-                    || (embedData.fields && embedData.fields.length > 0)
-                );
-
-                if (hasEmbedContent) {
-                    messagePayload.embeds = [welcomeEmbed];
-                }
-            } else if (hasCanvas && attachment) {
-                messagePayload.files.push(attachment);
+                const contentText = parseText(config.welcomeContent || '');
+                await channel.send({
+                    content: contentText || undefined,
+                    embeds: [embed],
+                    allowedMentions: { parse: ['users'] }
+                });
             }
 
-    const sentMessage = await welcomeChannel.send(messagePayload);
-    return {
-        success: true,
-        channelId: welcomeChannel.id,
-        messageId: sentMessage.id
-    };
-}
-
-module.exports = {
-    name: Events.GuildMemberAdd,
-    async execute(member) {
-        try {
-            return await sendWelcomeMessage(member);
         } catch (error) {
-            console.error('❌ 發送歡迎訊息時發生錯誤:', error);
-            return { success: false, error };
+            // 靜默略過
         }
-    },
-    // 提供測試指令呼叫同一套發送邏輯；錯誤會向呼叫端拋出，避免測試誤報成功。
-    sendWelcomeMessage
+    }
 };

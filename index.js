@@ -202,7 +202,7 @@ async function syncRulesMessage(guildId) {
 
         if (targetMsg) {
             if (targetMsg.author.id === client.user.id) {
-                await targetMsg.edit({ embeds: [ruleEmbed] }).catch(() => {});
+                await targetMsg.edit({ embeds: [ruleEmbed] }).catch(() => { });
             }
             await targetMsg.react(targetEmoji).catch(() => { });
             return;
@@ -248,7 +248,7 @@ async function syncTicketMessage(guildId) {
                 new ButtonBuilder().setCustomId('create_ticket').setLabel('建立工單').setEmoji('🎫').setStyle(ButtonStyle.Primary)
             );
 
-            await targetMsg.edit({ embeds: [embed], components: [row] }).catch(() => {});
+            await targetMsg.edit({ embeds: [embed], components: [row] }).catch(() => { });
         }
     } catch (err) {
         // 靜默略過
@@ -483,6 +483,7 @@ app.post('/api/save-config', async (req, res) => {
             embedColor: 'welcomeEmbedColor',
             welcomeImageUrl: 'welcomeImageUrl',
             canvasText: 'canvasText',
+            canvasAvatarSize: 'canvasAvatarSize',
             canvasMainText: 'canvasText',
             canvasSubText: 'canvasSubText',
             canvasColor: 'canvasColor',
@@ -845,7 +846,7 @@ async function startServer() {
         loadAllCommands(path.join(__dirname, 'commands/slash'), client.slashCommands);
         loadAllCommands(path.join(__dirname, 'commands/prefix'), client.prefixCommands);
 
-        app.listen(PORT, '0.0.0.0', () => {});
+        app.listen(PORT, '0.0.0.0', () => { });
 
         client.once(Events.ClientReady, async () => {
             try {
@@ -871,7 +872,7 @@ async function startServer() {
 
 startServer();
 
-process.on('unhandledRejection', () => {});
+process.on('unhandledRejection', () => { });
 process.on('uncaughtException', () => {
     process.exit(1);
 });
